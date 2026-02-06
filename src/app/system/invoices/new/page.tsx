@@ -84,6 +84,13 @@ export default function NewInvoicePage() {
     },
   });
 
+  useEffect(() => {
+    const current = form.getValues("currency");
+    if (!current || (!enableMultiCurrency && current !== defaultCurrency)) {
+      form.setValue("currency", defaultCurrency, { shouldValidate: true });
+    }
+  }, [defaultCurrency, enableMultiCurrency, form]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -286,40 +293,49 @@ export default function NewInvoicePage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Row 2: Currency + Payment Terms */}
-                {enableMultiCurrency ? (
-                  <FormField
-                    control={form.control}
-                    name="currency"
-                    render={({ field }) => (
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => {
+                    const selected = CURRENCIES.find((c) => c.code === (field.value || defaultCurrency));
+                    const options = enableMultiCurrency
+                      ? CURRENCIES
+                      : selected
+                        ? [selected]
+                        : [{ code: defaultCurrency, symbol: "", name: defaultCurrency }];
+
+                    return (
                       <FormItem>
                         <FormLabel>{t().invoices.currencyLabel}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={!enableMultiCurrency}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder={t().invoices.selectCurrency} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {CURRENCIES.map((curr) => (
+                            {options.map((curr) => (
                               <SelectItem key={curr.code} value={curr.code}>
-                                {curr.symbol} {curr.code} - {curr.name}
+                                {curr.symbol ? `${curr.symbol} ` : ""}{curr.code}{curr.name ? ` - ${curr.name}` : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
-                    )}
-                  />
-                ) : (
-                  <div />
-                )}
+                    );
+                  }}
+                />
 
                 <FormField
                   control={form.control}
                   name="paymentTerms"
                   render={({ field }) => (
-                    <FormItem className={!enableMultiCurrency ? "md:col-span-2" : undefined}>
+                    <FormItem>
                       <FormLabel>Condiciones de pago</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
