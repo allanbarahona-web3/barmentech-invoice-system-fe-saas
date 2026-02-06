@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "sonner";
+import { APP_TAG } from "@/lib/appTag";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>
+        <div className="fixed bottom-2 right-2 z-50 text-xs text-muted-foreground select-none">
+          Version: {APP_TAG}
+        </div>
         <Toaster />
         <Sonner />
       </body>
