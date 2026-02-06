@@ -8,9 +8,6 @@ import {
   FormProvider,
   useFormContext,
   useFormState,
-  type ControllerProps,
-  type FieldPath,
-  type FieldValues,
 } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
@@ -18,26 +15,39 @@ import { Label } from "@/components/ui/label"
 
 const Form = FormProvider
 
-type FormFieldContextValue<
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
-> = {
-  name: TName
+type FormFieldContextValue = {
+  name: string
 }
 
 const FormFieldContext = React.createContext<FormFieldContextValue>(
   {} as FormFieldContextValue
 )
 
-const FormField = <
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
->({
-  ...props
-}: ControllerProps<TFieldValues, TName>) => {
+type FormFieldRenderProps = {
+  field: any
+  fieldState: any
+  formState: any
+}
+
+type FormFieldProps = {
+  name: string
+  control?: any
+  defaultValue?: any
+  disabled?: boolean
+  rules?: any
+  shouldUnregister?: boolean
+  render: (props: FormFieldRenderProps) => React.ReactElement
+}
+
+// NOTE: We intentionally keep `FormField` loosely typed.
+// In some pnpm setups, TypeScript can treat `react-hook-form` types as duplicated,
+// leading to errors like “Two different types with this name exist, but they are unrelated”.
+// This wrapper is runtime-only (it forwards props to RHF's `Controller`), so loosening
+// the types avoids false-positive type conflicts without changing behavior.
+const FormField = (props: FormFieldProps) => {
   return (
     <FormFieldContext.Provider value={{ name: props.name }}>
-      <Controller {...props} />
+      <Controller {...(props as any)} />
     </FormFieldContext.Provider>
   )
 }

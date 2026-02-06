@@ -1,11 +1,48 @@
 // TODO: replace with API calls
 
-import type { Invoice, InvoiceInput, InvoiceItem, InvoiceEvent } from "./invoice.schema";
+import type { Invoice, InvoiceInput, InvoiceItem, InvoiceEvent, PaymentTerms } from "./invoice.schema";
 import { calcInvoiceTotals } from "./invoice.calc";
 import { generateInvoiceNumber, incrementInvoiceNumber } from "./invoice.numbering";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
 
 const STORAGE_KEY = "invoices";
+
+function getNetDaysFromTerms(
+  paymentTerms: PaymentTerms,
+  customNetDays?: number
+): number | undefined {
+  switch (paymentTerms) {
+    case "due_on_receipt":
+      return undefined;
+    case "net_15":
+      return 15;
+    case "net_30":
+      return 30;
+    case "net_60":
+      return 60;
+    case "net_90":
+      return 90;
+    case "custom":
+      return typeof customNetDays === "number" ? customNetDays : undefined;
+    default:
+      return undefined;
+  }
+}
+
+function computeDueDate(
+  createdAtIso: string,
+  paymentTerms: PaymentTerms,
+  customNetDays?: number
+): string | undefined {
+  const days = getNetDaysFromTerms(paymentTerms, customNetDays);
+  if (!days) return undefined;
+
+  const base = new Date(createdAtIso);
+  if (Number.isNaN(base.getTime())) return undefined;
+
+  base.setDate(base.getDate() + days);
+  return base.toISOString();
+}
 
 function generateId(): string {
   return `inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -136,6 +173,31 @@ function migrateInvoices(invoices: any[]): Invoice[] {
         }
       }
     }
+
+    // Payment terms (credit)
+    if (!invoice.paymentTerms) {
+      invoice.paymentTerms = "due_on_receipt";
+    }
+
+    if (invoice.paymentTerms !== "custom") {
+      // Avoid stale custom days when not needed
+      if (invoice.customNetDays !== undefined) {
+        delete invoice.customNetDays;
+      }
+    }
+
+    if (invoice.paymentTerms === "custom") {
+      if (typeof invoice.customNetDays !== "number" || !Number.isFinite(invoice.customNetDays) || invoice.customNetDays <= 0) {
+        // If custom was selected but days are invalid, fall back to due_on_receipt
+        invoice.paymentTerms = "due_on_receipt";
+        delete invoice.customNetDays;
+      }
+    }
+
+    if (!invoice.dueDate) {
+      const dueDate = computeDueDate(invoice.createdAt, invoice.paymentTerms, invoice.customNetDays);
+      if (dueDate) invoice.dueDate = dueDate;
+    }
     
     return invoice as Invoice;
   });
@@ -245,6 +307,9 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   );
 
   const now = new Date().toISOString();
+  const paymentTerms: PaymentTerms = input.paymentTerms || "due_on_receipt";
+  const customNetDays = paymentTerms === "custom" ? input.customNetDays : undefined;
+  const dueDate = computeDueDate(now, paymentTerms, customNetDays);
 
   let newInvoice: Invoice = {
     id: generateId(),
@@ -259,6 +324,9 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     status: input.status,
     createdAt: now,
     updatedAt: now,
+    paymentTerms,
+    customNetDays,
+    dueDate,
     events: [],
   };
 
@@ -328,6 +396,10 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
     settings.taxRate ?? 0
   );
 
+  const paymentTerms: PaymentTerms = input.paymentTerms || invoices[index].paymentTerms || "due_on_receipt";
+  const customNetDays = paymentTerms === "custom" ? input.customNetDays : undefined;
+  const dueDate = computeDueDate(invoices[index].createdAt, paymentTerms, customNetDays);
+
   let updatedInvoice: Invoice = {
     ...invoices[index],
     customerId: input.customerId,
@@ -336,6 +408,9 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
     tax,
     total,
     status: input.status,
+    paymentTerms,
+    customNetDays,
+    dueDate,
     updatedAt: new Date().toISOString(),
   };
 
@@ -523,6 +598,9 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
   }));
 
   const now = new Date().toISOString();
+  const paymentTerms: PaymentTerms = (quote.paymentTerms as PaymentTerms) || "due_on_receipt";
+  const customNetDays = paymentTerms === "custom" ? quote.customNetDays : undefined;
+  const dueDate = computeDueDate(now, paymentTerms, customNetDays);
 
   // Create new invoice from quote
   let newInvoice: Invoice = {
@@ -539,6 +617,9 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
     originQuoteId: quoteId, // Link back to original quote
     createdAt: now,
     updatedAt: now,
+    paymentTerms,
+    customNetDays,
+    dueDate,
     events: [],
   };
 

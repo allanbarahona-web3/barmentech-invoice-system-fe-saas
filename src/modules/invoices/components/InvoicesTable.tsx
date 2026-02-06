@@ -62,6 +62,29 @@ export function InvoicesTable() {
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
   const [activeTab, setActiveTab] = useState<string>("all");
 
+  const getPaymentTermsLabel = (invoice: Invoice): string => {
+    switch (invoice.paymentTerms) {
+      case "due_on_receipt":
+        return "Contado";
+      case "net_15":
+        return "Net 15";
+      case "net_30":
+        return "Net 30";
+      case "net_60":
+        return "Net 60";
+      case "net_90":
+        return "Net 90";
+      case "custom":
+        return invoice.customNetDays ? `Custom (${invoice.customNetDays} días)` : "Custom";
+      default:
+        return "—";
+    }
+  };
+
+  const isCreditInvoice = (invoice: Invoice): boolean => {
+    return invoice.paymentTerms !== "due_on_receipt";
+  };
+
   // Filter invoices based on active tab
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
@@ -73,6 +96,8 @@ export function InvoicesTable() {
         return invoices.filter(inv => inv.type === "invoice");
       case "quotes":
         return invoices.filter(inv => inv.type === "quote");
+      case "credit":
+        return invoices.filter(isCreditInvoice);
       case "draft":
         return invoices.filter(inv => inv.status === "draft");
       case "issued":
@@ -88,12 +113,13 @@ export function InvoicesTable() {
 
   // Count invoices by category
   const counts = useMemo(() => {
-    if (!invoices) return { all: 0, invoices: 0, quotes: 0, draft: 0, issued: 0, sent: 0, archived: 0 };
+    if (!invoices) return { all: 0, invoices: 0, quotes: 0, credit: 0, draft: 0, issued: 0, sent: 0, archived: 0 };
     
     return {
       all: invoices.length,
       invoices: invoices.filter(inv => inv.type === "invoice").length,
       quotes: invoices.filter(inv => inv.type === "quote").length,
+      credit: invoices.filter(isCreditInvoice).length,
       draft: invoices.filter(inv => inv.status === "draft").length,
       issued: invoices.filter(inv => inv.status === "issued").length,
       sent: invoices.filter(inv => inv.status === "sent").length,
@@ -170,6 +196,8 @@ export function InvoicesTable() {
               <TableHead>{t().invoices.tableHeaderCustomer}</TableHead>
               <TableHead className="text-right">{t().invoices.tableHeaderTotal}</TableHead>
               <TableHead>{t().invoices.tableHeaderStatus}</TableHead>
+              <TableHead>Términos</TableHead>
+              <TableHead>Vence</TableHead>
               <TableHead>{t().invoices.tableHeaderDate}</TableHead>
               <TableHead className="hidden md:table-cell">Última acción</TableHead>
               <TableHead className="text-right">{t().invoices.tableHeaderActions}</TableHead>
@@ -211,6 +239,20 @@ export function InvoicesTable() {
                       ? "Archivada"
                       : t().invoices.statusDraft}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {isCreditInvoice(invoice) ? (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {getPaymentTermsLabel(invoice)}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {invoice.dueDate && isCreditInvoice(invoice)
+                    ? new Date(invoice.dueDate).toLocaleDateString()
+                    : "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {new Date(invoice.createdAt).toLocaleDateString()}
@@ -258,7 +300,7 @@ export function InvoicesTable() {
   return (
     <>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-7 w-full mb-4">
+        <TabsList className="grid grid-cols-8 w-full mb-4">
           <TabsTrigger value="all" className="text-xs sm:text-sm">
             Todas ({counts.all})
           </TabsTrigger>
@@ -267,6 +309,9 @@ export function InvoicesTable() {
           </TabsTrigger>
           <TabsTrigger value="quotes" className="text-xs sm:text-sm">
             Cotizaciones ({counts.quotes})
+          </TabsTrigger>
+          <TabsTrigger value="credit" className="text-xs sm:text-sm">
+            Crédito ({counts.credit})
           </TabsTrigger>
           <TabsTrigger value="draft" className="text-xs sm:text-sm">
             Borradores ({counts.draft})

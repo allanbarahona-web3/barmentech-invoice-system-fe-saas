@@ -99,8 +99,8 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     if (companyProfile) {
       console.log('[InvoiceDetailPage] Company profile loaded:', {
-        hasLogo: !!companyProfile.logo,
-        hasName: !!companyProfile.name,
+        hasLogo: !!companyProfile.branding?.logoUrl,
+        hasName: !!companyProfile.legal?.legalName,
       });
     } else {
       console.warn('[InvoiceDetailPage] Company profile is missing');

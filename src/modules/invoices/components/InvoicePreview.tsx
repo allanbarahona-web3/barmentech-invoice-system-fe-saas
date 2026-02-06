@@ -24,6 +24,25 @@ export function InvoicePreview({
   const { branding, legal, fiscal } = companyProfile;
   const showCRInfo = isCREnabled(legal.country);
 
+  const getPaymentTermsLabel = () => {
+    switch (invoice.paymentTerms) {
+      case "due_on_receipt":
+        return "Contado";
+      case "net_15":
+        return "Net 15";
+      case "net_30":
+        return "Net 30";
+      case "net_60":
+        return "Net 60";
+      case "net_90":
+        return "Net 90";
+      case "custom":
+        return invoice.customNetDays ? `Custom (${invoice.customNetDays} días)` : "Custom";
+      default:
+        return "Contado";
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CR", {
@@ -99,21 +118,40 @@ export function InvoicePreview({
                   <span className="text-gray-600">{t().invoicePreview.date}:</span>{" "}
                   <span className="font-medium">{formatDate(invoice.createdAt)}</span>
                 </div>
+                {invoice.paymentTerms !== "due_on_receipt" && invoice.dueDate && (
+                  <>
+                    <div>
+                      <span className="text-gray-600">Términos:</span>{" "}
+                      <span className="font-medium">{getPaymentTermsLabel()}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Vence:</span>{" "}
+                      <span className="font-medium">{formatDate(invoice.dueDate)}</span>
+                    </div>
+                  </>
+                )}
                 <div>
                   <span className="text-gray-600">{t().invoicePreview.status}:</span>{" "}
                   <span
                     className="inline-block px-2 py-1 text-xs font-medium rounded"
                     style={{
                       backgroundColor:
-                        invoice.status === "issued"
+                        invoice.status === "issued" || invoice.status === "sent"
                           ? branding.secondaryColor || "#10b981"
                           : "#d1d5db",
-                      color: invoice.status === "issued" ? "#ffffff" : "#000000",
+                      color:
+                        invoice.status === "issued" || invoice.status === "sent"
+                          ? "#ffffff"
+                          : "#000000",
                     }}
                   >
                     {invoice.status === "issued"
                       ? t().invoices.statusIssued
-                      : t().invoices.statusDraft}
+                      : invoice.status === "sent"
+                        ? t().invoices.statusSent
+                        : invoice.status === "archived"
+                          ? t().invoices.statusArchived
+                          : t().invoices.statusDraft}
                   </span>
                 </div>
               </div>

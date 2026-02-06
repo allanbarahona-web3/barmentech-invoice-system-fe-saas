@@ -70,6 +70,8 @@ export default function NewInvoicePage() {
       type: "invoice",
       customerId: "",
       currency: defaultCurrency,
+      paymentTerms: "due_on_receipt",
+      customNetDays: undefined,
       items: [
         {
           description: "",
@@ -89,6 +91,7 @@ export default function NewInvoicePage() {
 
   const watchItems = form.watch("items");
   const watchType = form.watch("type");
+  const watchPaymentTerms = form.watch("paymentTerms");
   
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -227,81 +230,50 @@ export default function NewInvoicePage() {
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">{t().invoices.customerSection}</h3>
             <div className="space-y-4">
-              {/* Document Type Selector */}
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t().invoices.documentTypeLabel}</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="invoice">{t().invoices.documentTypeInvoice}</SelectItem>
-                        <SelectItem value="quote">{t().invoices.documentTypeQuote}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="customerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t().invoices.customerLabel}</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={loadingCustomers}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t().invoices.customerPlaceholder} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {customers?.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Currency selector - only if multi-currency is enabled */}
-              {enableMultiCurrency && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Row 1: Document Type + Customer */}
                 <FormField
                   control={form.control}
-                  name="currency"
+                  name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t().invoices.currencyLabel}</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <FormLabel>{t().invoices.documentTypeLabel}</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={t().invoices.selectCurrency} />
+                            <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {CURRENCIES.map((curr) => (
-                            <SelectItem key={curr.code} value={curr.code}>
-                              {curr.symbol} {curr.code} - {curr.name}
+                          <SelectItem value="invoice">{t().invoices.documentTypeInvoice}</SelectItem>
+                          <SelectItem value="quote">{t().invoices.documentTypeQuote}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t().invoices.customerLabel}</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        disabled={loadingCustomers}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t().invoices.customerPlaceholder} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers?.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -310,7 +282,93 @@ export default function NewInvoicePage() {
                     </FormItem>
                   )}
                 />
-              )}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Row 2: Currency + Payment Terms */}
+                {enableMultiCurrency ? (
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t().invoices.currencyLabel}</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t().invoices.selectCurrency} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CURRENCIES.map((curr) => (
+                              <SelectItem key={curr.code} value={curr.code}>
+                                {curr.symbol} {curr.code} - {curr.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="paymentTerms"
+                  render={({ field }) => (
+                    <FormItem className={!enableMultiCurrency ? "md:col-span-2" : undefined}>
+                      <FormLabel>Condiciones de pago</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="due_on_receipt">Contado (inmediato)</SelectItem>
+                          <SelectItem value="net_15">Crédito: Net 15</SelectItem>
+                          <SelectItem value="net_30">Crédito: Net 30</SelectItem>
+                          <SelectItem value="net_60">Crédito: Net 60</SelectItem>
+                          <SelectItem value="net_90">Crédito: Net 90</SelectItem>
+                          <SelectItem value="custom">Crédito: Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+
+                      {watchPaymentTerms === "custom" && (
+                        <div className="mt-3">
+                          <FormField
+                            control={form.control}
+                            name="customNetDays"
+                            render={({ field: daysField }) => (
+                              <FormItem>
+                                <FormLabel>Días (custom)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={365}
+                                    placeholder="Ej: 45"
+                                    value={daysField.value ?? ""}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      daysField.onChange(value === "" ? undefined : Number(value));
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
           </Card>
 
