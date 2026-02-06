@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Trash2, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -55,7 +56,50 @@ export function InvoicesTable() {
   const deleteMutation = useDeleteInvoice();
   const { toast } = useToast();
 
+  console.log('[InvoicesTable] Invoices loaded:', invoices?.length || 0);
+  console.log('[InvoicesTable] isLoading:', isLoading);
+
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
+  const [activeTab, setActiveTab] = useState<string>("all");
+
+  // Filter invoices based on active tab
+  const filteredInvoices = useMemo(() => {
+    if (!invoices) return [];
+    
+    switch (activeTab) {
+      case "all":
+        return invoices;
+      case "invoices":
+        return invoices.filter(inv => inv.type === "invoice");
+      case "quotes":
+        return invoices.filter(inv => inv.type === "quote");
+      case "draft":
+        return invoices.filter(inv => inv.status === "draft");
+      case "issued":
+        return invoices.filter(inv => inv.status === "issued");
+      case "sent":
+        return invoices.filter(inv => inv.status === "sent");
+      case "archived":
+        return invoices.filter(inv => inv.status === "archived");
+      default:
+        return invoices;
+    }
+  }, [invoices, activeTab]);
+
+  // Count invoices by category
+  const counts = useMemo(() => {
+    if (!invoices) return { all: 0, invoices: 0, quotes: 0, draft: 0, issued: 0, sent: 0, archived: 0 };
+    
+    return {
+      all: invoices.length,
+      invoices: invoices.filter(inv => inv.type === "invoice").length,
+      quotes: invoices.filter(inv => inv.type === "quote").length,
+      draft: invoices.filter(inv => inv.status === "draft").length,
+      issued: invoices.filter(inv => inv.status === "issued").length,
+      sent: invoices.filter(inv => inv.status === "sent").length,
+      archived: invoices.filter(inv => inv.status === "archived").length,
+    };
+  }, [invoices]);
 
   const getCustomerName = (customerId: string): string => {
     const customer = customers?.find(c => c.id === customerId);
@@ -103,12 +147,25 @@ export function InvoicesTable() {
     );
   }
 
-  return (
-    <>
+  const renderTable = () => {
+    if (filteredInvoices.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="rounded-full bg-muted p-4 mb-4">
+            <FileText className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No hay resultados</h3>
+          <p className="text-muted-foreground">No se encontraron facturas con este filtro</p>
+        </div>
+      );
+    }
+
+    return (
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Tipo</TableHead>
               <TableHead>{t().invoices.tableHeaderNumber}</TableHead>
               <TableHead>{t().invoices.tableHeaderCustomer}</TableHead>
               <TableHead className="text-right">{t().invoices.tableHeaderTotal}</TableHead>
@@ -119,8 +176,13 @@ export function InvoicesTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {invoices.map((invoice) => (
+            {filteredInvoices.map((invoice) => (
               <TableRow key={invoice.id}>
+                <TableCell>
+                  <Badge variant={invoice.type === "invoice" ? "default" : "secondary"}>
+                    {invoice.type === "invoice" ? "Factura" : "Cotización"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="font-medium font-mono">
                   {invoice.invoiceNumber}
                 </TableCell>
@@ -130,11 +192,23 @@ export function InvoicesTable() {
                 </TableCell>
                 <TableCell>
                   <Badge 
-                    variant={invoice.status === "issued" ? "default" : "secondary"}
-                    className={invoice.status === "issued" ? "bg-green-600 hover:bg-green-700" : ""}
+                    variant={
+                      invoice.status === "issued" ? "default" : 
+                      invoice.status === "sent" ? "default" :
+                      "secondary"
+                    }
+                    className={
+                      invoice.status === "issued" ? "bg-green-600 hover:bg-green-700" : 
+                      invoice.status === "sent" ? "bg-blue-600 hover:bg-blue-700" : 
+                      ""
+                    }
                   >
                     {invoice.status === "issued"
                       ? t().invoices.statusIssued
+                      : invoice.status === "sent"
+                      ? "Enviada"
+                      : invoice.status === "archived"
+                      ? "Archivada"
                       : t().invoices.statusDraft}
                   </Badge>
                 </TableCell>
@@ -178,6 +252,40 @@ export function InvoicesTable() {
           </TableBody>
         </Table>
       </div>
+    );
+  };
+
+  return (
+    <>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-7 w-full mb-4">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">
+            Todas ({counts.all})
+          </TabsTrigger>
+          <TabsTrigger value="invoices" className="text-xs sm:text-sm">
+            Facturas ({counts.invoices})
+          </TabsTrigger>
+          <TabsTrigger value="quotes" className="text-xs sm:text-sm">
+            Cotizaciones ({counts.quotes})
+          </TabsTrigger>
+          <TabsTrigger value="draft" className="text-xs sm:text-sm">
+            Borradores ({counts.draft})
+          </TabsTrigger>
+          <TabsTrigger value="issued" className="text-xs sm:text-sm">
+            Emitidas ({counts.issued})
+          </TabsTrigger>
+          <TabsTrigger value="sent" className="text-xs sm:text-sm">
+            Enviadas ({counts.sent})
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="text-xs sm:text-sm">
+            Archivadas ({counts.archived})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab}>
+          {renderTable()}
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
