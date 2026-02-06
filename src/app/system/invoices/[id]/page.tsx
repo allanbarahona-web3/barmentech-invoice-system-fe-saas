@@ -96,6 +96,28 @@ export default function InvoiceDetailPage() {
     }
   }, [customer]);
 
+  useEffect(() => {
+    if (companyProfile) {
+      console.log('[InvoiceDetailPage] Company profile loaded:', {
+        hasLogo: !!companyProfile.logo,
+        hasName: !!companyProfile.name,
+      });
+    } else {
+      console.warn('[InvoiceDetailPage] Company profile is missing');
+    }
+  }, [companyProfile]);
+
+  useEffect(() => {
+    if (tenantSettings) {
+      console.log('[InvoiceDetailPage] Tenant settings loaded:', {
+        currency: tenantSettings.currency,
+        taxEnabled: tenantSettings.taxEnabled,
+      });
+    } else {
+      console.warn('[InvoiceDetailPage] Tenant settings are missing');
+    }
+  }, [tenantSettings]);
+
   const handleExportPdf = async () => {
     if (!invoice) return;
     console.log('[InvoiceDetailPage] Exporting PDF for invoice:', invoice.id);
@@ -218,6 +240,11 @@ export default function InvoiceDetailPage() {
 
   // Empty state - missing related data (only check after loading is complete)
   if (!customer || !companyProfile || !tenantSettings) {
+    console.error('[InvoiceDetailPage] Missing required data:', {
+      hasCustomer: !!customer,
+      hasCompanyProfile: !!companyProfile,
+      hasTenantSettings: !!tenantSettings,
+    });
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
         <div className="text-center space-y-2">

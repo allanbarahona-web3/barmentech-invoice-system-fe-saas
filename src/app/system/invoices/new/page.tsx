@@ -35,7 +35,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { InvoiceInput, invoiceInputSchema } from "@/modules/invoices/invoice.schema";
-import { useCreateInvoice, calcLineTotal } from "@/modules/invoices";
+import { useCreateInvoice } from "@/modules/invoices/invoice.hooks";
+import { calcLineTotal } from "@/modules/invoices/invoice.calc";
 import { useCustomers } from "@/modules/customers/customer.hooks";
 import { useProducts } from "@/modules/products/product.hooks";
 import { useCompanyProfile } from "@/modules/company/company.hooks";

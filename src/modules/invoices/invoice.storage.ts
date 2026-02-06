@@ -55,6 +55,87 @@ function migrateInvoices(invoices: any[]): Invoice[] {
     if (!["draft", "issued", "sent", "archived"].includes(invoice.status)) {
       invoice.status = "draft";
     }
+
+    // Ensure items array exists and each item has an ID
+    if (!invoice.items) {
+      invoice.items = [];
+    } else {
+      invoice.items = invoice.items.map((item: any) => {
+        if (!item.id) {
+          item.id = generateItemId();
+        }
+        return item;
+      });
+    }
+
+    // Ensure events array exists
+    if (!invoice.events) {
+      invoice.events = [];
+    } else {
+      const validEventTypes = [
+        "CREATED", "CREATED_DRAFT", "UPDATED", "EXPORTED_PDF", 
+        "MARKED_ISSUED", "SENT", "QUOTE_SENT", "CONVERTED_TO_INVOICE",
+        "CREATED_FROM_QUOTE", "ARCHIVED"
+      ];
+      
+      // Ensure each event has required fields
+      invoice.events = invoice.events
+        .filter((event: any) => event && typeof event === 'object')
+        .map((event: any) => {
+          if (!event.id) {
+            event.id = generateEventId();
+          }
+          if (!event.at) {
+            event.at = new Date().toISOString();
+          }
+          // Ensure type is valid
+          if (!event.type || !validEventTypes.includes(event.type)) {
+            event.type = "UPDATED";
+          }
+          // Ensure meta is either undefined or an object
+          if (event.meta !== undefined && (typeof event.meta !== 'object' || Array.isArray(event.meta))) {
+            delete event.meta;
+          }
+          return event;
+        });
+    }
+
+    // Ensure required fields exist with defaults
+    if (!invoice.currency) {
+      invoice.currency = "USD";
+    }
+
+    if (!invoice.createdAt) {
+      invoice.createdAt = new Date().toISOString();
+    }
+
+    if (!invoice.updatedAt) {
+      invoice.updatedAt = invoice.createdAt || new Date().toISOString();
+    }
+
+    // Ensure numeric fields are numbers
+    if (typeof invoice.subtotal !== 'number') {
+      invoice.subtotal = 0;
+    }
+    if (typeof invoice.tax !== 'number') {
+      invoice.tax = 0;
+    }
+    if (typeof invoice.total !== 'number') {
+      invoice.total = 0;
+    }
+
+    // Clean up sent field - must be undefined or a valid InvoiceSent object
+    if (invoice.sent !== undefined) {
+      if (!invoice.sent || typeof invoice.sent !== 'object' || !invoice.sent.sentAt) {
+        // Invalid sent object, remove it
+        delete invoice.sent;
+      } else {
+        // Ensure sent has default method if missing
+        if (!invoice.sent.method) {
+          invoice.sent.method = "manual";
+        }
+      }
+    }
     
     return invoice as Invoice;
   });
@@ -62,24 +143,59 @@ function migrateInvoices(invoices: any[]): Invoice[] {
 
 function getStoredInvoices(): Invoice[] {
   try {
+    console.log('[invoice.storage] getStoredInvoices - Reading from key:', STORAGE_KEY);
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
+    console.log('[invoice.storage] getStoredInvoices - Raw localStorage data:', stored ? `${stored.substring(0, 100)}...` : 'null');
+    
+    if (!stored) {
+      console.log('[invoice.storage] getStoredInvoices - No data in localStorage, returning empty array');
+      return [];
+    }
 
     const parsed = JSON.parse(stored);
+    console.log('[invoice.storage] getStoredInvoices - Parsed count:', parsed.length);
     
     // Migrate old invoices to new schema
     const migrated = migrateInvoices(parsed);
+    console.log('[invoice.storage] getStoredInvoices - After migration, validating', migrated.length, 'invoices');
+    
+    // Debug: Check if invoiceSchema is defined
+    console.log('[invoice.storage] getStoredInvoices - invoiceSchema is:', typeof invoiceSchema, invoiceSchema);
+    
+    if (!invoiceSchema || typeof invoiceSchema !== 'object') {
+      console.error('[invoice.storage] getStoredInvoices - invoiceSchema is undefined! Returning migrated data without validation.');
+      return migrated;
+    }
     
     const validated = invoiceSchema.array().safeParse(migrated);
 
-    return validated.success ? validated.data : [];
-  } catch {
+    if (!validated.success) {
+      console.error('[invoice.storage] getStoredInvoices - Validation failed:', validated.error);
+      console.error('[invoice.storage] getStoredInvoices - First invoice that failed:', JSON.stringify(migrated[0], null, 2));
+      return [];
+    }
+
+    const result = validated.data;
+    console.log('[invoice.storage] getStoredInvoices - Returning', result.length, 'invoices:', result.map(inv => inv.id));
+    return result;
+  } catch (error) {
+    console.error('[invoice.storage] getStoredInvoices - Error reading from localStorage:', error);
     return [];
   }
 }
 
 function saveInvoices(invoices: Invoice[]): void {
+  console.log('[invoice.storage] saveInvoices - Saving', invoices.length, 'invoices to key:', STORAGE_KEY);
+  console.log('[invoice.storage] saveInvoices - Invoice IDs being saved:', invoices.map(inv => inv.id));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices));
+  console.log('[invoice.storage] saveInvoices - Save complete, verifying...');
+  const verification = localStorage.getItem(STORAGE_KEY);
+  if (verification) {
+    const verifiedCount = JSON.parse(verification).length;
+    console.log('[invoice.storage] saveInvoices - Verification: Successfully saved', verifiedCount, 'invoices');
+  } else {
+    console.error('[invoice.storage] saveInvoices - Verification FAILED: localStorage is empty!');
+  }
 }
 
 export async function listInvoices(): Promise<Invoice[]> {
@@ -177,7 +293,13 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   }
 
   invoices.push(newInvoice);
+  console.log('[invoice.storage] createInvoice - About to save', invoices.length, 'invoices (including new one)');
   saveInvoices(invoices);
+
+  // Verify the invoice was saved
+  const verifyRead = getStoredInvoices();
+  const savedInvoice = verifyRead.find(inv => inv.id === newInvoice.id);
+  console.log('[invoice.storage] createInvoice - Verification: New invoice present after save?', !!savedInvoice);
 
   // Increment invoice number for next invoice
   await incrementInvoiceNumber();
@@ -316,13 +438,21 @@ export async function recordInvoiceSent(
   toEmail?: string,
   message?: string
 ): Promise<Invoice> {
+  console.log('[invoice.storage] recordInvoiceSent called:', { id, toEmail, hasMessage: !!message });
+  
+  // Check localStorage directly before calling getStoredInvoices
+  const rawData = localStorage.getItem(STORAGE_KEY);
+  console.log('[invoice.storage] recordInvoiceSent - Direct localStorage check:', rawData ? `Has data (${rawData.length} chars)` : 'EMPTY/NULL');
+  
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 200));
 
   const invoices = getStoredInvoices();
+  console.log('[invoice.storage] All invoice IDs:', invoices.map(inv => inv.id));
   const index = invoices.findIndex(inv => inv.id === id);
 
   if (index === -1) {
+    console.error('[invoice.storage] Invoice not found with id:', id);
     throw new Error("Invoice not found");
   }
 
@@ -452,7 +582,13 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
 
   // Add new invoice to storage
   invoices.push(newInvoice);
+  console.log('[invoice.storage] convertQuoteToInvoice - About to save', invoices.length, 'invoices (including new invoice)');
   saveInvoices(invoices);
+
+  // Verify the invoice was saved
+  const verifyRead = getStoredInvoices();
+  const savedInvoice = verifyRead.find(inv => inv.id === newInvoice.id);
+  console.log('[invoice.storage] convertQuoteToInvoice - Verification: New invoice present after save?', !!savedInvoice);
 
   // Increment invoice number for next invoice
   await incrementInvoiceNumber();
