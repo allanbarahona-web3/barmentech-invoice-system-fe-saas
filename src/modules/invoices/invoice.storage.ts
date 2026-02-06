@@ -1,6 +1,6 @@
 // TODO: replace with API calls
 
-import { Invoice, InvoiceInput, invoiceSchema, InvoiceItem, InvoiceEvent } from "./invoice.schema";
+import type { Invoice, InvoiceInput, InvoiceItem, InvoiceEvent } from "./invoice.schema";
 import { calcInvoiceTotals } from "./invoice.calc";
 import { generateInvoiceNumber, incrementInvoiceNumber } from "./invoice.numbering";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
@@ -157,27 +157,9 @@ function getStoredInvoices(): Invoice[] {
     
     // Migrate old invoices to new schema
     const migrated = migrateInvoices(parsed);
-    console.log('[invoice.storage] getStoredInvoices - After migration, validating', migrated.length, 'invoices');
+    console.log('[invoice.storage] getStoredInvoices - After migration, returning', migrated.length, 'invoices');
     
-    // Debug: Check if invoiceSchema is defined
-    console.log('[invoice.storage] getStoredInvoices - invoiceSchema is:', typeof invoiceSchema, invoiceSchema);
-    
-    if (!invoiceSchema || typeof invoiceSchema !== 'object') {
-      console.error('[invoice.storage] getStoredInvoices - invoiceSchema is undefined! Returning migrated data without validation.');
-      return migrated;
-    }
-    
-    const validated = invoiceSchema.array().safeParse(migrated);
-
-    if (!validated.success) {
-      console.error('[invoice.storage] getStoredInvoices - Validation failed:', validated.error);
-      console.error('[invoice.storage] getStoredInvoices - First invoice that failed:', JSON.stringify(migrated[0], null, 2));
-      return [];
-    }
-
-    const result = validated.data;
-    console.log('[invoice.storage] getStoredInvoices - Returning', result.length, 'invoices:', result.map(inv => inv.id));
-    return result;
+    return migrated;
   } catch (error) {
     console.error('[invoice.storage] getStoredInvoices - Error reading from localStorage:', error);
     return [];
