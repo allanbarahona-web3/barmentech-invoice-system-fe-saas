@@ -540,7 +540,7 @@ export default function NewInvoicePage() {
                         <FormLabel>{t().invoices.currencyLabel}</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                           disabled={!enableMultiCurrency}
                         >
                           <FormControl>

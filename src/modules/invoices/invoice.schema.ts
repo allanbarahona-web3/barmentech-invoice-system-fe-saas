@@ -90,6 +90,9 @@ export const invoiceSchema = z.object({
   paymentTerms: paymentTermsSchema.default("due_on_receipt"),
   customNetDays: z.number().int().min(1).max(365).optional(),
   dueDate: z.string().optional(),
+  // Exchange rate for currency conversion
+  exchangeRate: z.number().optional(), // Rate to convert to company's base currency
+  exchangeRateDate: z.string().optional(), // Date when rate was captured
   // Recurring configuration (premium feature)
   recurringConfig: recurringConfigSchema.optional(),
   // Scheduled send configuration

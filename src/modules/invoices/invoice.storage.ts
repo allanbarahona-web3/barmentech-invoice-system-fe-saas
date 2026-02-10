@@ -11,6 +11,8 @@ import {
   incrementInvoiceNumber 
 } from "./invoice.numbering";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
+import { getExchangeRate, getCountryBaseCurrency } from "@/lib/exchangeRates";
+import { getCompanyProfile } from "@/modules/company/company.storage";
 
 const STORAGE_KEY = "invoices";
 
@@ -361,10 +363,32 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
 
   const invoices = getStoredInvoices();
   const settings = await tenantSettingsService.getTenantSettings();
+  const companyProfile = await getCompanyProfile();
 
   if (!settings) {
     console.error('[invoice.storage] Tenant settings not found');
     throw new Error("Tenant settings not found");
+  }
+
+  // Calculate exchange rate if needed
+  const invoiceCurrency = input.currency || settings.currency;
+  let exchangeRate: number | undefined;
+  let exchangeRateDate: string | undefined;
+  
+  if (companyProfile?.legal?.country) {
+    const baseCurrency = getCountryBaseCurrency(companyProfile.legal.country);
+    if (baseCurrency !== invoiceCurrency) {
+      const rate = getExchangeRate(invoiceCurrency, baseCurrency);
+      if (rate) {
+        exchangeRate = rate.rate;
+        exchangeRateDate = rate.lastUpdated;
+        console.log('[invoice.storage] Exchange rate calculated:', {
+          from: invoiceCurrency,
+          to: baseCurrency,
+          rate: exchangeRate,
+        });
+      }
+    }
   }
 
   // Generate appropriate document number based on type and status
@@ -425,6 +449,8 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     paymentTerms,
     customNetDays,
     dueDate,
+    exchangeRate,
+    exchangeRateDate,
     events: [],
     recurringConfig: input.recurringConfig, // Add recurring configuration
     scheduledSend: input.scheduledSend, // Add scheduled send configuration

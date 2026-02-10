@@ -9,6 +9,7 @@ import { TenantSettings } from "@/schemas/tenantSettings.schema";
 import { CustomHeaderField } from "@/modules/company/company.schema";
 import { Product } from "@/modules/products/product.schema";
 import { calcTotalDiscount } from "../invoice.calc";
+import { getCountryBaseCurrency, convertCurrency } from "@/lib/exchangeRates";
 // import { isCREnabled } from "@/modules/company/company.country";
 // import { buildCRFiscalSummary } from "@/country-packs/cr";
 import { t } from "@/i18n";
@@ -34,6 +35,13 @@ export function InvoicePreview({
 
   // Calculate total discount
   const totalDiscount = calcTotalDiscount(invoice.items);
+
+  // Calculate currency conversion if needed
+  const baseCurrency = legal.country ? getCountryBaseCurrency(legal.country) : null;
+  const showConversion = baseCurrency && baseCurrency !== invoice.currency && invoice.exchangeRate;
+  const convertedSubtotal = showConversion ? convertCurrency(invoice.subtotal, invoice.currency, baseCurrency) : null;
+  const convertedTax = showConversion ? convertCurrency(invoice.tax, invoice.currency, baseCurrency) : null;
+  const convertedTotal = showConversion ? convertCurrency(invoice.total, invoice.currency, baseCurrency) : null;
 
   // Debug recurring config
   useEffect(() => {
@@ -241,6 +249,34 @@ export function InvoicePreview({
             </div>
           )}
 
+          {/* Exchange Rate Banner (QuickBooks style) */}
+          {showConversion && invoice.exchangeRate && baseCurrency && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="bg-blue-50 dark:bg-blue-950 px-4 py-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <span className="font-medium text-blue-900 dark:text-blue-100">
+                        Tipo de cambio:
+                      </span>
+                      <span className="ml-2 text-blue-700 dark:text-blue-300">
+                        1 {invoice.currency} = {invoice.exchangeRate.toFixed(4)} {baseCurrency}
+                      </span>
+                    </div>
+                  </div>
+                  {invoice.exchangeRateDate && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                      {new Date(invoice.exchangeRateDate).toLocaleDateString('es-CR')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* CR Fiscal Info - Hidden by default, can be enabled via custom header fields in the future */}
           {/* {showCRInfo && fiscal.cr && (
             <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-600">
@@ -390,13 +426,33 @@ export function InvoicePreview({
             <div className="w-80 space-y-2">
               <div className="flex justify-between text-gray-700">
                 <span>{t().invoicePreview.subtotal}:</span>
-                <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
+                <div className="text-right">
+                  <div className="font-medium">{formatCurrency(invoice.subtotal)}</div>
+                  {showConversion && convertedSubtotal !== null && baseCurrency && (
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      ≈ {new Intl.NumberFormat("es-CR", {
+                        style: "currency",
+                        currency: baseCurrency,
+                      }).format(convertedSubtotal)}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {totalDiscount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>Descuento total:</span>
-                  <span className="font-medium">-{formatCurrency(totalDiscount)}</span>
+                  <div className="text-right">
+                    <div className="font-medium">-{formatCurrency(totalDiscount)}</div>
+                    {showConversion && baseCurrency && (
+                      <div className="text-xs text-green-500 mt-0.5">
+                        ≈ -{new Intl.NumberFormat("es-CR", {
+                          style: "currency",
+                          currency: baseCurrency,
+                        }).format(convertCurrency(totalDiscount, invoice.currency, baseCurrency) || 0)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -405,7 +461,17 @@ export function InvoicePreview({
                   <span>
                     {tenantSettings.taxName} ({tenantSettings.taxRate}%):
                   </span>
-                  <span className="font-medium">{formatCurrency(invoice.tax)}</span>
+                  <div className="text-right">
+                    <div className="font-medium">{formatCurrency(invoice.tax)}</div>
+                    {showConversion && convertedTax !== null && baseCurrency && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        ≈ {new Intl.NumberFormat("es-CR", {
+                          style: "currency",
+                          currency: baseCurrency,
+                        }).format(convertedTax)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -414,7 +480,17 @@ export function InvoicePreview({
                 style={{ borderColor: branding.primaryColor || "#000000" }}
               >
                 <span>{t().invoicePreview.total}:</span>
-                <span>{formatCurrency(invoice.total)}</span>
+                <div className="text-right">
+                  <div>{formatCurrency(invoice.total)}</div>
+                  {showConversion && convertedTotal !== null && baseCurrency && (
+                    <div className="text-sm font-semibold text-gray-600 mt-1">
+                      ≈ {new Intl.NumberFormat("es-CR", {
+                        style: "currency",
+                        currency: baseCurrency,
+                      }).format(convertedTotal)}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
