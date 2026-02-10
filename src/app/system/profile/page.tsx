@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { User, Mail, Building2, Calendar, Save } from "lucide-react";
 import { t } from "@/i18n";
+import { TwoFactorSetup } from "@/modules/auth/components/TwoFactorSetup";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState({
@@ -185,10 +186,13 @@ export default function ProfilePage() {
             Gestiona tu contraseña y opciones de seguridad
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Button variant="outline">Cambiar contraseña</Button>
         </CardContent>
       </Card>
+
+      {/* Two-Factor Authentication */}
+      <TwoFactorSetup userEmail={profile.email} />
     </div>
   );
 }

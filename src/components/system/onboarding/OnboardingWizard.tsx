@@ -35,11 +35,11 @@ export function OnboardingWizard() {
 
   const [formData, setFormData] = useState({
     companyName: "",
-    country: "CR",
-    currency: "CRC",
-    taxEnabled: true,
-    taxName: "IVA",
-    taxRate: 13,
+    country: "US",
+    currency: "USD",
+    taxEnabled: false,
+    taxName: "Sales Tax",
+    taxRate: 0,
     invoicePrefix: "INV-",
     nextInvoiceNumber: 1,
   });

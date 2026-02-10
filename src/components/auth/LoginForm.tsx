@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -22,11 +22,16 @@ import { setAccessToken, setRole } from "@/lib/authContext";
 import { setTenantContext } from "@/lib/tenantContext";
 import { Role } from "@/lib/rbacEngine";
 import { t } from "@/i18n";
+import { hasTwoFactorEnabled } from "@/modules/auth/twoFactor.storage";
+import { TwoFactorVerifyDialog } from "@/modules/auth/components/TwoFactorVerifyDialog";
 
 export function LoginForm() {
     const router = useRouter();
     const { toast } = useToast();
     const formMountTime = useRef<number>(0);
+    const [show2FADialog, setShow2FADialog] = useState(false);
+    const [pendingEmail, setPendingEmail] = useState("");
+    const [pendingRole, setPendingRole] = useState<Role>(Role.TENANT_ADMIN);
 
     useEffect(() => {
         formMountTime.current = Date.now();
@@ -71,27 +76,17 @@ export function LoginForm() {
                 role = Role.VIEWER;
             }
 
-            // Set auth data
-            setAccessToken("demo_token_" + Date.now());
-            setRole(role);
-            
-            // Set tenant context for non-super-admin users
-            if (role !== Role.SUPER_ADMIN) {
-                setTenantContext("demo-tenant-id", "demo-tenant");
+            // Check if user has 2FA enabled
+            if (hasTwoFactorEnabled(data.email)) {
+                // Store pending data and show 2FA dialog
+                setPendingEmail(data.email);
+                setPendingRole(role);
+                setShow2FADialog(true);
+                return;
             }
 
-            toast({
-                title: "Inicio exitoso",
-                description: "Bienvenido de vuelta",
-            });
-
-            // Redirect based on role
-            if (role === Role.SUPER_ADMIN) {
-                router.push("/platform-admin/dashboard");
-            } else {
-                router.push("/system/dashboard");
-            }
-
+            // Complete login without 2FA
+            completeLogin(role);
             form.reset();
         } catch (error) {
             // Generic error message to prevent user enumeration
@@ -101,6 +96,45 @@ export function LoginForm() {
                 variant: "destructive",
             });
         }
+    };
+
+    const completeLogin = (role: Role) => {
+        // Set auth data
+        setAccessToken("demo_token_" + Date.now());
+        setRole(role);
+        
+        // Set tenant context for non-super-admin users
+        if (role !== Role.SUPER_ADMIN) {
+            setTenantContext("demo-tenant-id", "demo-tenant");
+        }
+
+        toast({
+            title: "Inicio exitoso",
+            description: "Bienvenido de vuelta",
+        });
+
+        // Redirect based on role
+        if (role === Role.SUPER_ADMIN) {
+            router.push("/platform-admin/dashboard");
+        } else {
+            router.push("/system/dashboard");
+        }
+    };
+
+    const handle2FAVerified = () => {
+        setShow2FADialog(false);
+        completeLogin(pendingRole);
+        form.reset();
+    };
+
+    const handle2FACancel = () => {
+        setShow2FADialog(false);
+        setPendingEmail("");
+        toast({
+            title: "Inicio de sesión cancelado",
+            description: "Se requiere verificación 2FA para continuar",
+            variant: "destructive",
+        });
     };
 
     return (
@@ -129,7 +163,15 @@ export function LoginForm() {
                     name="password"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Password</FormLabel>
+                            <div className="flex items-center justify-between">
+                                <FormLabel>Password</FormLabel>
+                                <Link
+                                    href="/forgot-password"
+                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    {t().auth.forgotPassword}
+                                </Link>
+                            </div>
                             <FormControl>
                                 <Input
                                     placeholder="••••••••"
@@ -175,6 +217,14 @@ export function LoginForm() {
                     </Link>
                 </p>
             </form>
+
+            <TwoFactorVerifyDialog
+                open={show2FADialog}
+                onOpenChange={setShow2FADialog}
+                email={pendingEmail}
+                onVerified={handle2FAVerified}
+                onCancel={handle2FACancel}
+            />
         </Form>
     );
 }

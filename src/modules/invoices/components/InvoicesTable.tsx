@@ -31,6 +31,7 @@ import { RegisterPaymentDialog } from "@/modules/payments/components/RegisterPay
 import { tenantSettingsService } from "@/services/tenantSettingsService";
 import { usePayments } from "@/modules/payments/payments.hooks";
 import { getInvoicePaymentInfo, getPaymentStatusLabel, getPaymentStatusVariant } from "@/modules/payments/payments.utils";
+import { ReminderButton } from "@/modules/reminders/components";
 
 function getLastEvent(invoice: Invoice): InvoiceEvent | undefined {
   if (!invoice.events || invoice.events.length === 0) return undefined;
@@ -362,6 +363,15 @@ export function InvoicesTable() {
                       >
                         <Wallet className="h-4 w-4 text-green-600" />
                       </Button>
+                    )}
+                    {invoice.type === "invoice" && (
+                      <ReminderButton
+                        invoice={invoice}
+                        customer={customers?.find(c => c.id === invoice.customerId) || { id: invoice.customerId, name: "Cliente desconocido", email: "", status: "active", contactPreferences: { preferredChannel: "email", consentStatus: "unknown", preferredTime: "any", allowEmail: true, allowWhatsApp: false }, createdAt: "", updatedAt: "" }}
+                        variant="ghost"
+                        size="icon"
+                        showBadge
+                      />
                     )}
                     <Button
                       variant="ghost"

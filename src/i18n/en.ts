@@ -547,7 +547,7 @@ export const en = {
     contact: "Contact"
   },
   plans: {
-    free: "Free",
+    freeLabel: "Free",
     month: "month",
     currentPlan: "Current plan",
     trial: {
@@ -562,6 +562,18 @@ export const en = {
         support: "Email support"
       }
     },
+    free: {
+      name: "Free",
+      description: "Get started with the basics",
+      cta: "Get Started Free",
+      features: {
+        invoices: "Up to 10 invoices/month",
+        customers: "Up to 5 customers",
+        products: "Up to 10 products",
+        emailSupport: "Email support",
+        basicReports: "Basic reports"
+      }
+    },
     starter: {
       name: "Starter",
       description: "Perfect for freelancers and small businesses",
@@ -572,7 +584,8 @@ export const en = {
         unlimitedProducts: "Unlimited products",
         emailSupport: "Email support",
         exportPdf: "Export to PDF",
-        branding: "Custom branding"
+        branding: "Custom branding",
+        manualReminders: "Manual reminders (50/month)"
       }
     },
     pro: {
@@ -586,7 +599,25 @@ export const en = {
         api: "REST API access",
         prioritySupport: "Priority support",
         customReports: "Custom reports",
-        whiteLabel: "Full white label"
+        whiteLabel: "Full white label",
+        scheduledReminders: "Scheduled reminders",
+        autoReminders: "Automatic reminders",
+        unlimitedReminders: "Unlimited reminders"
+      }
+    },
+    premium: {
+      name: "Premium",
+      description: "For enterprises that need maximum power",
+      badge: "Enterprise",
+      cta: "Contact Sales",
+      features: {
+        everything: "Everything in Pro, plus:",
+        unlimitedUsers: "Unlimited users",
+        dedicatedSupport: "Dedicated 24/7 support",
+        customIntegrations: "Custom integrations",
+        advancedAnalytics: "Advanced analytics",
+        sla: "Guaranteed SLA",
+        customBranding: "Corporate branding"
       }
     }
   },

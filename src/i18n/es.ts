@@ -546,7 +546,7 @@ export const es = {
     contact: "Contactar"
   },
   plans: {
-    free: "Gratis",
+    freeLabel: "Gratis",
     month: "mes",
     currentPlan: "Plan actual",
     trial: {
@@ -561,6 +561,18 @@ export const es = {
         support: "Soporte por email"
       }
     },
+    free: {
+      name: "Gratis",
+      description: "Para comenzar con lo básico",
+      cta: "Comenzar Gratis",
+      features: {
+        invoices: "Hasta 10 facturas/mes",
+        customers: "Hasta 5 clientes",
+        products: "Hasta 10 productos",
+        emailSupport: "Soporte por email",
+        basicReports: "Reportes básicos"
+      }
+    },
     starter: {
       name: "Starter",
       description: "Perfecto para freelancers y pequeños negocios",
@@ -571,7 +583,8 @@ export const es = {
         unlimitedProducts: "Productos ilimitados",
         emailSupport: "Soporte por email",
         exportPdf: "Exportar a PDF",
-        branding: "Personalización de marca"
+        branding: "Personalización de marca",
+        manualReminders: "Recordatorios manuales (50/mes)"
       }
     },
     pro: {
@@ -585,7 +598,25 @@ export const es = {
         api: "Acceso a API REST",
         prioritySupport: "Soporte prioritario",
         customReports: "Reportes personalizados",
-        whiteLabel: "White label completo"
+        whiteLabel: "White label completo",
+        scheduledReminders: "Recordatorios programados",
+        autoReminders: "Recordatorios automáticos",
+        unlimitedReminders: "Recordatorios ilimitados"
+      }
+    },
+    premium: {
+      name: "Premium",
+      description: "Para empresas que necesitan el máximo poder",
+      badge: "Empresas",
+      cta: "Contactar Ventas",
+      features: {
+        everything: "Todo lo de Pro, más:",
+        unlimitedUsers: "Usuarios ilimitados",
+        dedicatedSupport: "Soporte dedicado 24/7",
+        customIntegrations: "Integraciones personalizadas",
+        advancedAnalytics: "Analíticas avanzadas",
+        sla: "SLA garantizado",
+        customBranding: "Branding corporativo"
       }
     }
   },
