@@ -30,14 +30,21 @@ interface InvoiceTableProps {
     onDelete?: (id: string) => void;
 }
 
-function getStatusBadge(status: Invoice["status"]) {
-    const colors = {
-        draft: "bg-gray-100 text-gray-800",
-        sent: "bg-blue-100 text-blue-800",
-        paid: "bg-green-100 text-green-800",
-        overdue: "bg-red-100 text-red-800",
-    };
-    return colors[status];
+function getStatusBadge(status: Invoice["status"]): {
+    variant: "success" | "warning" | "destructive" | "secondary";
+    label: string;
+} {
+    switch (status) {
+        case "paid":
+            return { variant: "success", label: "Paid" };
+        case "sent":
+            return { variant: "warning", label: "Sent" };
+        case "overdue":
+            return { variant: "destructive", label: "Overdue" };
+        case "draft":
+        default:
+            return { variant: "secondary", label: "Draft" };
+    }
 }
 
 export function InvoiceTable({
@@ -88,15 +95,9 @@ export function InvoiceTable({
                                     </TableCell>
                                     <TableCell>
                                         <Badge
-                                            variant="outline"
-                                            className={getStatusBadge(
-                                                invoice.status
-                                            )}
+                                            variant={getStatusBadge(invoice.status).variant}
                                         >
-                                            {invoice.status
-                                                .charAt(0)
-                                                .toUpperCase() +
-                                                invoice.status.slice(1)}
+                                            {getStatusBadge(invoice.status).label}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>

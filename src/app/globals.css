@@ -25,6 +25,12 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -54,8 +60,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.48 0.18 255);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -65,7 +71,13 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.48 0.18 255);
+  --success: oklch(0.65 0.16 150);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.75 0.15 85);
+  --warning-foreground: oklch(0.2 0 0);
+  --info: oklch(0.58 0.18 245);
+  --info-foreground: oklch(0.99 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -88,8 +100,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.62 0.22 255);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -97,6 +109,12 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.68 0.18 155);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.72 0.16 90);
+  --warning-foreground: oklch(0.15 0 0);
+  --info: oklch(0.65 0.20 245);
+  --info-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -131,19 +149,58 @@
     size: A4;
   }
 
-  body {
+  * {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Hide navigation and UI elements */
   nav,
   aside,
-  header:not(.invoice-header),
-  footer:not(.invoice-footer),
+  header,
+  footer,
   button,
-  .no-print {
+  .no-print,
+  [data-sonner-toaster],
+  [data-sonner-toast],
+  [role="status"],
+  [role="alert"],
+  .fixed,
+  [class*="z-50"] {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Show only invoice content */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Preserve invoice grids but hide layout grids */
+  [class*="lg:grid-cols"] {
+    display: block !important;
+  }
+
+  /* Keep essential grids for invoice structure */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    display: grid !important;
   }
 
   /* Prevent page breaks inside elements */
@@ -167,11 +224,41 @@
   }
 
   /* Ensure full width usage */
-  body,
   .invoice-preview {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove shadows and borders that are UI-only */
+  .shadow-lg,
+  .shadow-md,
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  /* Table styling for print */
+  table {
     width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
+    font-size: 10pt;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    font-weight: 600;
+    padding: 8px !important;
+    text-align: left;
+  }
+
+  td {
+    padding: 6px 8px !important;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* Badge sizing for print */
+  [data-slot="badge"] {
+    font-size: 9pt !important;
+    padding: 2px 6px !important;
   }
 }

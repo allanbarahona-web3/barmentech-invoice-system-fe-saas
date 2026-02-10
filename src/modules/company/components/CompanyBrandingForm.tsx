@@ -4,14 +4,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageUploader } from "@/components/shared/ImageUploader";
 import { InvoicePreviewLive } from "./InvoicePreviewLive";
+import { CustomHeaderFieldsManager } from "./CustomHeaderFieldsManager";
 import { useUpdateCompanyProfile, useCompanyProfile } from "../company.hooks";
-import { brandingSchema } from "../company.schema";
+import { brandingSchema, type CustomHeaderField } from "../company.schema";
 import { t } from "@/i18n";
 
 type BrandingFormData = z.infer<typeof brandingSchema>;
@@ -23,6 +25,24 @@ interface CompanyBrandingFormProps {
 export function CompanyBrandingForm({ initialData }: CompanyBrandingFormProps) {
   const { mutate: updateProfile, isPending } = useUpdateCompanyProfile();
   const { data: companyProfile } = useCompanyProfile();
+  const [customHeaderFields, setCustomHeaderFields] = useState<CustomHeaderField[]>([]);
+
+  // Load custom header fields from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("customHeaderFields");
+    if (stored) {
+      try {
+        setCustomHeaderFields(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse custom header fields:", e);
+      }
+    }
+  }, []);
+
+  // Save custom header fields to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("customHeaderFields", JSON.stringify(customHeaderFields));
+  }, [customHeaderFields]);
 
   const {
     register,
@@ -157,6 +177,14 @@ export function CompanyBrandingForm({ initialData }: CompanyBrandingFormProps) {
               {isPending ? t().companySettings.saving : t().companySettings.saveChanges}
             </Button>
           </form>
+
+          {/* Custom Header Fields Section */}
+          <div className="mt-6 pt-6 border-t">
+            <CustomHeaderFieldsManager
+              fields={customHeaderFields}
+              onChange={setCustomHeaderFields}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -174,6 +202,7 @@ export function CompanyBrandingForm({ initialData }: CompanyBrandingFormProps) {
           address={companyProfile?.legal?.address}
           taxId={companyProfile?.fiscal?.taxId}
           currency={companyProfile?.legal?.currency}
+          customHeaderFields={customHeaderFields}
         />
       </div>
     </div>

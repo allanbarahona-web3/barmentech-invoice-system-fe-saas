@@ -1,11 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { Repeat, Calendar, CalendarX2, Sparkles } from "lucide-react";
 import { Invoice } from "../invoice.schema";
 import { CompanyProfile } from "@/modules/company/company.schema";
 import { Customer } from "@/modules/customers/customer.schema";
 import { TenantSettings } from "@/schemas/tenantSettings.schema";
-import { isCREnabled } from "@/modules/company/company.country";
-import { buildCRFiscalSummary } from "@/country-packs/cr";
+import { CustomHeaderField } from "@/modules/company/company.schema";
+import { Product } from "@/modules/products/product.schema";
+// import { isCREnabled } from "@/modules/company/company.country";
+// import { buildCRFiscalSummary } from "@/country-packs/cr";
 import { t } from "@/i18n";
 
 interface InvoicePreviewProps {
@@ -13,6 +17,7 @@ interface InvoicePreviewProps {
   companyProfile: CompanyProfile;
   customer: Customer;
   tenantSettings: TenantSettings;
+  products?: Product[];
 }
 
 export function InvoicePreview({
@@ -20,9 +25,34 @@ export function InvoicePreview({
   companyProfile,
   customer,
   tenantSettings,
+  products = [],
 }: InvoicePreviewProps) {
   const { branding, legal, fiscal } = companyProfile;
-  const showCRInfo = isCREnabled(legal.country);
+  // const showCRInfo = isCREnabled(legal.country);
+  const [customHeaderFields, setCustomHeaderFields] = useState<CustomHeaderField[]>([]);
+
+  // Debug recurring config
+  useEffect(() => {
+    console.log('[InvoicePreview] Invoice recurring config:', {
+      hasRecurringConfig: !!invoice.recurringConfig,
+      enabled: invoice.recurringConfig?.enabled,
+      fullConfig: invoice.recurringConfig,
+    });
+  }, [invoice.recurringConfig]);
+
+  // Load custom header fields from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("customHeaderFields");
+    if (stored) {
+      try {
+        const fields = JSON.parse(stored) as CustomHeaderField[];
+        // Only include enabled fields
+        setCustomHeaderFields(fields.filter(f => f.enabled));
+      } catch (e) {
+        console.error("Failed to parse custom header fields:", e);
+      }
+    }
+  }, []);
 
   const getPaymentTermsLabel = () => {
     switch (invoice.paymentTerms) {
@@ -43,6 +73,18 @@ export function InvoicePreview({
     }
   };
 
+  const getRecurringFrequencyLabel = (frequency: string) => {
+    const labels: Record<string, string> = {
+      "weekly": "Semanal (cada 7 días)",
+      "biweekly": "Quincenal (cada 15 días)",
+      "monthly": "Mensual (cada mes)",
+      "quarterly": "Trimestral (cada 3 meses)",
+      "semiannual": "Semestral (cada 6 meses)",
+      "annual": "Anual (cada año)",
+    };
+    return labels[frequency] || frequency;
+  };
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CR", {
@@ -61,8 +103,8 @@ export function InvoicePreview({
   };
 
   return (
-    <div className="bg-white text-black min-h-screen p-8 print:p-0">
-      <div className="max-w-4xl mx-auto bg-white shadow-lg print:shadow-none">
+    <div className="bg-white text-black min-h-screen p-8 print:min-h-0 print:p-0 print:bg-white">
+      <div className="max-w-4xl mx-auto bg-white shadow-lg print:shadow-none print:max-w-none">
         {/* Header */}
         <div
           className="p-8 border-b-4"
@@ -70,41 +112,63 @@ export function InvoicePreview({
             borderColor: branding.primaryColor || "#000000",
           }}
         >
-          <div className="flex justify-between items-start">
-            {/* Company Info */}
+          <div className="grid grid-cols-3 gap-6 items-start">
+            {/* Grid 1: Company Info */}
             <div className="space-y-2">
               {branding.logoUrl && (
                 <img
                   src={branding.logoUrl}
                   alt="Logo"
-                  className="h-16 object-contain mb-4"
+                  className="h-14 object-contain mb-3"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
               )}
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-gray-900">
                 {legal.commercialName || legal.legalName}
               </h1>
               {legal.commercialName && legal.legalName !== legal.commercialName && (
-                <p className="text-sm text-gray-600">{legal.legalName}</p>
+                <p className="text-xs text-gray-600">{legal.legalName}</p>
               )}
               {fiscal.taxId && (
                 <p className="text-sm text-gray-700">
-                  {t().invoicePreview.taxId}: <span className="font-medium">{fiscal.taxId}</span>
+                  <span className="font-medium">ID Fiscal:</span> {fiscal.taxId}
                 </p>
               )}
-              {legal.address && <p className="text-sm text-gray-600">{legal.address}</p>}
-              <div className="text-sm text-gray-600">
-                {legal.email && <div>{legal.email}</div>}
-                {legal.phone && <div>{legal.phone}</div>}
+              {legal.country && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">País:</span> {legal.country}
+                </p>
+              )}
+            </div>
+
+            {/* Grid 2: Contact Info */}
+            <div className="space-y-2">
+              {/* Spacer to align with company name */}
+              {branding.logoUrl && <div className="h-14 mb-3" />}
+              <div className="text-xl font-bold mb-2 invisible">Spacer</div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                Contacto
+              </h3>
+              <div className="text-sm text-gray-600 space-y-1">
+                {legal.email && (
+                  <p>
+                    <span className="font-medium">Email:</span> {legal.email}
+                  </p>
+                )}
+                {legal.phone && (
+                  <p>
+                    <span className="font-medium">Teléfono:</span> {legal.phone}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Invoice Info */}
+            {/* Grid 3: Invoice Info */}
             <div className="text-right space-y-2">
               <h2
-                className="text-3xl font-bold"
+                className="text-2xl font-bold"
                 style={{ color: branding.primaryColor || "#000000" }}
               >
                 {invoice.type === "quote" ? t().invoicePreview.quote : t().invoicePreview.invoice}
@@ -136,11 +200,11 @@ export function InvoicePreview({
                     className="inline-block px-2 py-1 text-xs font-medium rounded"
                     style={{
                       backgroundColor:
-                        invoice.status === "issued" || invoice.status === "sent"
+                        invoice.status === "issued" || invoice.status === "sent" || invoice.status === "paid"
                           ? branding.secondaryColor || "#10b981"
                           : "#d1d5db",
                       color:
-                        invoice.status === "issued" || invoice.status === "sent"
+                        invoice.status === "issued" || invoice.status === "sent" || invoice.status === "paid"
                           ? "#ffffff"
                           : "#000000",
                     }}
@@ -149,17 +213,32 @@ export function InvoicePreview({
                       ? t().invoices.statusIssued
                       : invoice.status === "sent"
                         ? t().invoices.statusSent
-                        : invoice.status === "archived"
-                          ? t().invoices.statusArchived
-                          : t().invoices.statusDraft}
+                        : invoice.status === "paid"
+                          ? "Pagada"
+                          : invoice.status === "archived"
+                            ? t().invoices.statusArchived
+                            : t().invoices.statusDraft}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* CR Fiscal Info (if applicable) */}
-          {showCRInfo && fiscal.cr && (
+          {/* Custom Header Fields */}
+          {customHeaderFields.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-600">
+              <div className="grid grid-cols-2 gap-2">
+                {customHeaderFields.map((field) => (
+                  <div key={field.id}>
+                    <span className="font-medium">{field.label}:</span> {field.value}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CR Fiscal Info - Hidden by default, can be enabled via custom header fields in the future */}
+          {/* {showCRInfo && fiscal.cr && (
             <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-600">
               <div className="grid grid-cols-2 gap-2">
                 {buildCRFiscalSummary(fiscal.cr).map((line, idx) => (
@@ -167,26 +246,73 @@ export function InvoicePreview({
                 ))}
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Customer Section */}
         <div className="p-8 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-            {t().invoicePreview.billedTo}
-          </h3>
-          <div className="space-y-1">
-            <p className="font-semibold text-gray-900">{customer.name}</p>
-            {customer.idNumber && (
-              <p className="text-sm text-gray-600">
-                {t().invoicePreview.idNumber}: {customer.idNumber}
-              </p>
-            )}
-            {customer.email && <p className="text-sm text-gray-600">{customer.email}</p>}
-            {customer.phone && <p className="text-sm text-gray-600">{customer.phone}</p>}
-            {customer.address && <p className="text-sm text-gray-600">{customer.address}</p>}
+          <div className="grid grid-cols-2 gap-8">
+            {/* Grid 1: Facturado A */}
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                {t().invoicePreview.billedTo}
+              </h3>
+              <div className="text-sm">
+                <p className="text-gray-600">
+                  <span className="font-medium">Nombre:</span>{" "}
+                  <span className="text-gray-900">{customer.name}</span>
+                </p>
+                {customer.idNumber && (
+                  <p className="text-gray-600">
+                    <span className="font-medium">ID:</span>{" "}
+                    <span className="text-gray-900">{customer.idNumber}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Grid 2: Contact Info */}
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                Contacto
+              </h3>
+              <div className="text-sm">
+                {customer.email && (
+                  <p className="text-gray-600">
+                    <span className="font-medium">Email:</span>{" "}
+                    <span className="text-gray-900">{customer.email}</span>
+                  </p>
+                )}
+                {customer.phone && (
+                  <p className="text-gray-600">
+                    <span className="font-medium">Tel(s):</span>{" "}
+                    <span className="text-gray-900">{customer.phone}</span>
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Recurring Invoice Info (Premium Feature) */}
+        {invoice.recurringConfig?.enabled && (
+          <div className="px-8 py-3 bg-gray-50 border-y border-gray-300">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Repeat className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-gray-700">
+                  Facturación recurrente activa
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>Próxima fecha de cobro:</span>
+                <span className="font-semibold text-gray-900">
+                  {formatDate(invoice.recurringConfig.nextGenerationDate)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Items Table */}
         <div className="p-8">
@@ -196,6 +322,9 @@ export function InvoicePreview({
                 className="border-b-2"
                 style={{ borderColor: branding.primaryColor || "#000000" }}
               >
+                <th className="text-left py-3 font-semibold text-gray-700 w-[200px]">
+                  Producto
+                </th>
                 <th className="text-left py-3 font-semibold text-gray-700">
                   {t().invoicePreview.description}
                 </th>
@@ -211,18 +340,24 @@ export function InvoicePreview({
               </tr>
             </thead>
             <tbody>
-              {invoice.items.map((item) => (
-                <tr key={item.id} className="border-b border-gray-200">
-                  <td className="py-3 text-gray-800">{item.description}</td>
-                  <td className="py-3 text-right text-gray-800">{item.qty}</td>
-                  <td className="py-3 text-right text-gray-800">
-                    {formatCurrency(item.unitPrice)}
-                  </td>
-                  <td className="py-3 text-right font-medium text-gray-900">
-                    {formatCurrency(item.qty * item.unitPrice)}
-                  </td>
-                </tr>
-              ))}
+              {invoice.items.map((item) => {
+                const product = item.productId ? products.find(p => p.id === item.productId) : null;
+                return (
+                  <tr key={item.id} className="border-b border-gray-200">
+                    <td className="py-3 text-gray-800">
+                      {product ? product.name : "-"}
+                    </td>
+                    <td className="py-3 text-gray-800">{item.description}</td>
+                    <td className="py-3 text-right text-gray-800">{item.qty}</td>
+                    <td className="py-3 text-right text-gray-800">
+                      {formatCurrency(item.unitPrice)}
+                    </td>
+                    <td className="py-3 text-right font-medium text-gray-900">
+                      {formatCurrency(item.qty * item.unitPrice)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

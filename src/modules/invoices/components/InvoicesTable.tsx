@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Trash2, Loader2, FileText } from "lucide-react";
+import { Eye, Trash2, Loader2, FileText, Repeat, Clock, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -27,6 +27,10 @@ import { useInvoices, useDeleteInvoice } from "../invoice.hooks";
 import { useCustomers } from "@/modules/customers/customer.hooks";
 import { useToast } from "@/hooks/use-toast";
 import { t } from "@/i18n";
+import { RegisterPaymentDialog } from "@/modules/payments/components/RegisterPaymentDialog";
+import { tenantSettingsService } from "@/services/tenantSettingsService";
+import { usePayments } from "@/modules/payments/payments.hooks";
+import { getInvoicePaymentInfo, getPaymentStatusLabel, getPaymentStatusVariant } from "@/modules/payments/payments.utils";
 
 function getLastEvent(invoice: Invoice): InvoiceEvent | undefined {
   if (!invoice.events || invoice.events.length === 0) return undefined;
@@ -45,6 +49,9 @@ function getEventLabel(eventType: InvoiceEvent["type"]): string {
     QUOTE_SENT: t().invoiceActivity.eventQuoteSent,
     CONVERTED_TO_INVOICE: t().invoiceActivity.eventConvertedToInvoice,
     ARCHIVED: t().invoiceActivity.eventArchived,
+    MARKED_PAID: "Marcada como Pagada",
+    PAYMENT_REGISTERED: "Pago Registrado",
+    PAYMENT_DELETED: "Pago Eliminado",
   };
   return labels[eventType] || eventType;
 }
@@ -53,6 +60,7 @@ export function InvoicesTable() {
   const router = useRouter();
   const { data: invoices, isLoading } = useInvoices();
   const { data: customers } = useCustomers();
+  const { data: allPayments = [] } = usePayments();
   const deleteMutation = useDeleteInvoice();
   const { toast } = useToast();
 
@@ -61,6 +69,18 @@ export function InvoicesTable() {
 
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | undefined>();
+  const [country, setCountry] = useState<string>("");
+
+  useEffect(() => {
+    const loadCountry = async () => {
+      const settings = await tenantSettingsService.getTenantSettings();
+      if (settings) {
+        setCountry(settings.country);
+      }
+    };
+    loadCountry();
+  }, []);
 
   const getPaymentTermsLabel = (invoice: Invoice): string => {
     switch (invoice.paymentTerms) {
@@ -104,6 +124,8 @@ export function InvoicesTable() {
         return invoices.filter(inv => inv.status === "issued");
       case "sent":
         return invoices.filter(inv => inv.status === "sent");
+      case "paid":
+        return invoices.filter(inv => inv.status === "paid");
       case "archived":
         return invoices.filter(inv => inv.status === "archived");
       default:
@@ -113,7 +135,7 @@ export function InvoicesTable() {
 
   // Count invoices by category
   const counts = useMemo(() => {
-    if (!invoices) return { all: 0, invoices: 0, quotes: 0, credit: 0, draft: 0, issued: 0, sent: 0, archived: 0 };
+    if (!invoices) return { all: 0, invoices: 0, quotes: 0, credit: 0, draft: 0, issued: 0, sent: 0, paid: 0, archived: 0 };
     
     return {
       all: invoices.length,
@@ -123,6 +145,7 @@ export function InvoicesTable() {
       draft: invoices.filter(inv => inv.status === "draft").length,
       issued: invoices.filter(inv => inv.status === "issued").length,
       sent: invoices.filter(inv => inv.status === "sent").length,
+      paid: invoices.filter(inv => inv.status === "paid").length,
       archived: invoices.filter(inv => inv.status === "archived").length,
     };
   }, [invoices]);
@@ -196,6 +219,8 @@ export function InvoicesTable() {
               <TableHead>{t().invoices.tableHeaderCustomer}</TableHead>
               <TableHead className="text-right">{t().invoices.tableHeaderTotal}</TableHead>
               <TableHead>{t().invoices.tableHeaderStatus}</TableHead>
+              <TableHead>Estado Pago</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
               <TableHead>Términos</TableHead>
               <TableHead>Vence</TableHead>
               <TableHead>{t().invoices.tableHeaderDate}</TableHead>
@@ -204,7 +229,12 @@ export function InvoicesTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredInvoices.map((invoice) => (
+            {filteredInvoices.map((invoice) => {
+              const paymentInfo = invoice.type === "invoice" 
+                ? getInvoicePaymentInfo(invoice.id, invoice.total, allPayments)
+                : null;
+                
+              return (
               <TableRow key={invoice.id}>
                 <TableCell>
                   <Badge variant={invoice.type === "invoice" ? "default" : "secondary"}>
@@ -212,7 +242,29 @@ export function InvoicesTable() {
                   </Badge>
                 </TableCell>
                 <TableCell className="font-medium font-mono">
-                  {invoice.invoiceNumber}
+                  <div className="flex items-center gap-2">
+                    <span>{invoice.invoiceNumber}</span>
+                    {invoice.recurringConfig?.enabled && (
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs font-normal flex items-center gap-1 px-2 py-0 h-5 border-blue-200 text-blue-600 bg-blue-50"
+                        title={`Factura recurrente ${invoice.recurringConfig.frequency === "weekly" ? "Semanal" : invoice.recurringConfig.frequency === "biweekly" ? "Quincenal" : invoice.recurringConfig.frequency === "monthly" ? "Mensual" : invoice.recurringConfig.frequency === "quarterly" ? "Trimestral" : invoice.recurringConfig.frequency === "semiannual" ? "Semestral" : "Anual"} - Próxima: ${invoice.recurringConfig.nextGenerationDate ? new Date(invoice.recurringConfig.nextGenerationDate).toLocaleDateString() : "—"}`}
+                      >
+                        <Repeat className="h-3 w-3" />
+                        <span className="hidden sm:inline">Recurrente</span>
+                      </Badge>
+                    )}
+                    {invoice.scheduledSend?.enabled && invoice.scheduledSend.status === "pending" && (
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs font-normal flex items-center gap-1 px-2 py-0 h-5 border-emerald-200 text-emerald-600 bg-emerald-50"
+                        title={`Envío programado para: ${new Date(invoice.scheduledSend.scheduledFor).toLocaleString()} - Email: ${invoice.scheduledSend.toEmail}`}
+                      >
+                        <Clock className="h-3 w-3" />
+                        <span className="hidden sm:inline">Programado</span>
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>{getCustomerName(invoice.customerId)}</TableCell>
                 <TableCell className="text-right font-medium">
@@ -223,11 +275,13 @@ export function InvoicesTable() {
                     variant={
                       invoice.status === "issued" ? "default" : 
                       invoice.status === "sent" ? "default" :
+                      invoice.status === "paid" ? "default" :
                       "secondary"
                     }
                     className={
                       invoice.status === "issued" ? "bg-green-600 hover:bg-green-700" : 
                       invoice.status === "sent" ? "bg-blue-600 hover:bg-blue-700" : 
+                      invoice.status === "paid" ? "bg-emerald-600 hover:bg-emerald-700" :
                       ""
                     }
                   >
@@ -235,10 +289,34 @@ export function InvoicesTable() {
                       ? t().invoices.statusIssued
                       : invoice.status === "sent"
                       ? "Enviada"
+                      : invoice.status === "paid"
+                      ? "Pagada"
                       : invoice.status === "archived"
                       ? "Archivada"
                       : t().invoices.statusDraft}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {invoice.type === "invoice" && paymentInfo ? (
+                    <Badge variant={getPaymentStatusVariant(paymentInfo.status)}>
+                      {getPaymentStatusLabel(paymentInfo.status)}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {invoice.type === "invoice" && paymentInfo ? (
+                    <span className={
+                      paymentInfo.balance > 0 
+                        ? "font-medium text-amber-600" 
+                        : "text-green-600"
+                    }>
+                      ${paymentInfo.balance.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {isCreditInvoice(invoice) ? (
@@ -272,6 +350,19 @@ export function InvoicesTable() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    {(invoice.status === "issued" || invoice.status === "sent") && 
+                     invoice.type === "invoice" && 
+                     paymentInfo && 
+                     paymentInfo.status !== "paid" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPaymentInvoice(invoice)}
+                        title="Registrar pago"
+                      >
+                        <Wallet className="h-4 w-4 text-green-600" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -290,7 +381,8 @@ export function InvoicesTable() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -365,6 +457,21 @@ export function InvoicesTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payment Dialog */}
+      {paymentInvoice && (
+        <RegisterPaymentDialog
+          open={!!paymentInvoice}
+          onOpenChange={(open) => !open && setPaymentInvoice(undefined)}
+          invoice={{
+            id: paymentInvoice.id,
+            invoiceNumber: paymentInvoice.invoiceNumber,
+            total: paymentInvoice.total,
+            totalPaid: getInvoicePaymentInfo(paymentInvoice.id, paymentInvoice.total, allPayments).totalPaid,
+          }}
+          country={country}
+        />
+      )}
     </>
   );
 }

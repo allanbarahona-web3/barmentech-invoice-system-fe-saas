@@ -58,16 +58,19 @@ const invoices: Invoice[] = [
     },
 ];
 
-function getStatusColor(status: Invoice["status"]) {
+function getStatusBadge(status: Invoice["status"]): {
+    variant: "success" | "warning" | "destructive";
+    label: string;
+} {
     switch (status) {
         case "paid":
-            return "bg-green-100 text-green-800";
+            return { variant: "success", label: "Paid" };
         case "pending":
-            return "bg-blue-100 text-blue-800";
+            return { variant: "warning", label: "Pending" };
         case "overdue":
-            return "bg-red-100 text-red-800";
+            return { variant: "destructive", label: "Overdue" };
         default:
-            return "bg-gray-100 text-gray-800";
+            return { variant: "warning", label: "Pending" };
     }
 }
 
@@ -103,11 +106,9 @@ export function RecentInvoicesTable() {
                                     <TableCell>{invoice.amount}</TableCell>
                                     <TableCell>
                                         <Badge
-                                            variant="outline"
-                                            className={getStatusColor(invoice.status)}
+                                            variant={getStatusBadge(invoice.status).variant}
                                         >
-                                            {invoice.status.charAt(0).toUpperCase() +
-                                                invoice.status.slice(1)}
+                                            {getStatusBadge(invoice.status).label}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">

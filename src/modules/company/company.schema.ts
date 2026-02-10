@@ -1,12 +1,21 @@
 import { z } from "zod";
 import { crFiscalProfileSchema, type CRFiscalProfile } from "@/country-packs/cr";
 
+// ===== CUSTOM HEADER FIELDS =====
+export const customHeaderFieldSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1).max(50),
+  value: z.string().max(200),
+  enabled: z.boolean(),
+});
+
 // ===== BRANDING (GLOBAL) =====
 export const brandingSchema = z.object({
   logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   invoiceFooter: z.string().optional(),
+  customHeaderFields: z.array(customHeaderFieldSchema).optional(),
 });
 
 // ===== LEGAL (GLOBAL) =====
@@ -61,6 +70,7 @@ export const companyProfileInputSchema = z.object({
 });
 
 // ===== TYPES =====
+export type CustomHeaderField = z.infer<typeof customHeaderFieldSchema>;
 export type Branding = z.infer<typeof brandingSchema>;
 export type Legal = z.infer<typeof legalSchema>;
 export type FiscalBase = z.infer<typeof fiscalBaseSchema>;

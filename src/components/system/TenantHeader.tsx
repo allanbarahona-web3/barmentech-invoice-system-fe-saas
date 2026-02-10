@@ -34,7 +34,7 @@ export function TenantHeader() {
     };
 
     return (
-        <header className="border-b bg-background px-6 py-4">
+        <header className="border-b bg-background px-6 py-4 no-print">
             <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                     <h1 className="text-2xl font-bold">{t().common.dashboard}</h1>

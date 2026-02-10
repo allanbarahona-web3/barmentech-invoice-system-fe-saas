@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building2, ChevronRight, Globe } from 'lucide-react';
+import { Building2, ChevronRight, Globe, Sparkles } from 'lucide-react';
 import { t } from '@/i18n';
 import Link from 'next/link';
 import { tenantSettingsService } from '@/services/tenantSettingsService';
@@ -89,6 +89,38 @@ export default function SettingsPage() {
                     {t().system.configureAccount}
                 </p>
             </div>
+
+            {/* Premium Features Section */}
+            <Card className="border-2 bg-gradient-to-br from-amber-500/5 to-purple-600/5 border-amber-500/30 hover:border-amber-500/50 transition-colors">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-amber-500" />
+                        <CardTitle>Características Premium</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Descubre funcionalidades avanzadas para automatizar tu facturación
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        <div className="text-sm text-muted-foreground">
+                            <ul className="space-y-1 list-disc list-inside">
+                                <li>Facturas recurrentes automáticas</li>
+                                <li>Envío programado de facturas</li>
+                                <li>CC ilimitados en emails (Business+)</li>
+                                <li>Ahorra tiempo y automatiza cobros</li>
+                            </ul>
+                        </div>
+                        <Button asChild className="w-full bg-gradient-to-r from-amber-500 to-purple-600 hover:from-amber-600 hover:to-purple-700">
+                            <Link href="/system/settings/features">
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                Ver características Premium
+                                <ChevronRight className="h-4 w-4 ml-2" />
+                            </Link>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Company Settings Section */}
             <Card className="border-2 hover:border-primary/50 transition-colors">

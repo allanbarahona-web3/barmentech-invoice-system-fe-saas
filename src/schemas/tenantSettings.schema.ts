@@ -48,7 +48,20 @@ export const tenantSettingsSchema = z.object({
   taxRate: z.number().min(0).max(100).optional(),
   invoicePrefix: z.string(),
   nextInvoiceNumber: z.number().min(1),
+  // Separate numbering for different document types
+  draftPrefix: z.string().optional().default("DRF-"),
+  nextDraftNumber: z.number().min(1).optional().default(1),
+  quotePrefix: z.string().optional().default("COT-"),
+  nextQuoteNumber: z.number().min(1).optional().default(1),
+  // Payment methods accepted by the company
+  acceptedPaymentMethods: z.array(z.string()).optional().default([]),
   onboardingCompleted: z.boolean(),
+  // Premium features (controlled by subscription plan)
+  features: z.object({
+    allowRecurringInvoices: z.boolean().default(false),
+    allowScheduledSend: z.boolean().default(false),
+    allowUnlimitedCC: z.boolean().default(false), // More than 2 CC recipients
+  }).optional(),
 });
 
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;

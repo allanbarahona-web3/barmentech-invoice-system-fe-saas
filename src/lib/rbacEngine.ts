@@ -32,6 +32,12 @@ const permissionMatrix: Record<Area, PermissionRule> = {
         invoices: [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ACCOUNTANT],
         customers: [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ACCOUNTANT],
         products: [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ACCOUNTANT],
+        reports: [
+            Role.SUPER_ADMIN,
+            Role.TENANT_ADMIN,
+            Role.ACCOUNTANT,
+            Role.VIEWER,
+        ],
         settings: [Role.SUPER_ADMIN, Role.TENANT_ADMIN],
     },
     "platform-admin": {

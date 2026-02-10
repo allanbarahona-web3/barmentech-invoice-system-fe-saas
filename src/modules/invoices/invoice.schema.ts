@@ -14,6 +14,7 @@ export const invoiceItemSchema = z.object({
   description: z.string().min(1),
   qty: z.number().min(0.01),
   unitPrice: z.number().min(0),
+  discount: z.number().min(0).max(100).default(0),
   productId: z.string().optional(),
 });
 
@@ -22,6 +23,34 @@ export const invoiceSentSchema = z.object({
   message: z.string().optional(),
   sentAt: z.string(),
   method: z.enum(["manual", "email"]).default("manual"),
+});
+
+export const scheduledSendSchema = z.object({
+  enabled: z.boolean(),
+  scheduledFor: z.string(), // ISO datetime - cuando se enviará
+  toEmail: z.string().email(),
+  cc: z.array(z.string().email()).optional(), // Emails en copia
+  message: z.string().optional(),
+  status: z.enum(["pending", "sent", "failed", "cancelled"]).default("pending"),
+});
+
+export const recurringFrequencySchema = z.enum([
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "semiannual",
+  "annual",
+]);
+
+export const recurringConfigSchema = z.object({
+  enabled: z.boolean(),
+  frequency: recurringFrequencySchema,
+  startDate: z.string(), // ISO date - cuando empieza la recurrencia
+  endDate: z.string().optional(), // ISO date - cuando termina (null = sin fin)
+  nextGenerationDate: z.string(), // ISO date - próxima factura a generar
+  lastGeneratedDate: z.string().optional(), // ISO date - última factura generada
+  parentInvoiceId: z.string().optional(), // ID de la factura original/plantilla
 });
 
 export const invoiceEventSchema = z.object({
@@ -37,6 +66,9 @@ export const invoiceEventSchema = z.object({
     "CONVERTED_TO_INVOICE",
     "CREATED_FROM_QUOTE",
     "ARCHIVED",
+    "MARKED_PAID",
+    "PAYMENT_REGISTERED",
+    "PAYMENT_DELETED",
   ]),
   at: z.string(), // ISO datetime
   meta: z.record(z.string()).optional(),
@@ -52,12 +84,16 @@ export const invoiceSchema = z.object({
   subtotal: z.number(),
   tax: z.number(),
   total: z.number(),
-  status: z.enum(["draft", "issued", "sent", "archived"]),
+  status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
   createdAt: z.string(),
   updatedAt: z.string(),
   paymentTerms: paymentTermsSchema.default("due_on_receipt"),
   customNetDays: z.number().int().min(1).max(365).optional(),
   dueDate: z.string().optional(),
+  // Recurring configuration (premium feature)
+  recurringConfig: recurringConfigSchema.optional(),
+  // Scheduled send configuration
+  scheduledSend: scheduledSendSchema.optional(),
   // Metadata and audit trail
   originQuoteId: z.string().optional(), // For invoices created from quotes
   archivedAt: z.string().optional(),
@@ -78,11 +114,14 @@ export const invoiceInputSchema = z
           description: z.string().min(1),
           qty: z.number().min(0.01),
           unitPrice: z.number().min(0),
+          discount: z.number().min(0).default(0),
           productId: z.string().optional(),
         })
       )
       .min(1),
-    status: z.enum(["draft", "issued", "sent", "archived"]),
+    status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
+    recurringConfig: recurringConfigSchema.optional(),
+    scheduledSend: scheduledSendSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.paymentTerms === "custom" && !data.customNetDays) {
@@ -96,7 +135,10 @@ export const invoiceInputSchema = z
 
 export type InvoiceItem = z.infer<typeof invoiceItemSchema>;
 export type InvoiceSent = z.infer<typeof invoiceSentSchema>;
+export type ScheduledSend = z.infer<typeof scheduledSendSchema>;
 export type InvoiceEvent = z.infer<typeof invoiceEventSchema>;
 export type PaymentTerms = z.infer<typeof paymentTermsSchema>;
+export type RecurringFrequency = z.infer<typeof recurringFrequencySchema>;
+export type RecurringConfig = z.infer<typeof recurringConfigSchema>;
 export type Invoice = z.infer<typeof invoiceSchema>;
 export type InvoiceInput = z.infer<typeof invoiceInputSchema>;

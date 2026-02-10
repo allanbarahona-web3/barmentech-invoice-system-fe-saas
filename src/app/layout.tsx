@@ -33,7 +33,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>
-        <div className="fixed bottom-2 right-2 z-50 text-xs text-muted-foreground select-none">
+        <div className="fixed bottom-2 right-2 z-50 text-xs text-muted-foreground select-none no-print">
           Version: {APP_TAG}
         </div>
         <Toaster />

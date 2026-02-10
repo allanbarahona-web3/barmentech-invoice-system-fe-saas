@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CustomersTable } from "@/modules/customers/components/CustomersTable";
+import { CustomersTable, ImportCustomersDialog } from "@/modules/customers/components";
 import { CustomerDialog } from "@/modules/customers/components/CustomerDialog";
 import { t } from "@/i18n";
 
 export default function CustomersPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -18,10 +19,16 @@ export default function CustomersPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t().customers.pageTitle}</h1>
           <p className="text-muted-foreground mt-2">{t().customers.pageDescription}</p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          {t().customers.newCustomerButton}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            {t().customers.newCustomerButton}
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -29,6 +36,9 @@ export default function CustomersPage() {
 
       {/* Create Dialog */}
       <CustomerDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+
+      {/* Import Dialog */}
+      <ImportCustomersDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </div>
   );
 }

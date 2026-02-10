@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { CustomHeaderField } from "../company.schema";
 
 interface InvoicePreviewLiveProps {
   logoUrl?: string;
@@ -14,6 +15,7 @@ interface InvoicePreviewLiveProps {
   address?: string;
   taxId?: string;
   currency?: string;
+  customHeaderFields?: CustomHeaderField[];
 }
 
 export function InvoicePreviewLive({
@@ -28,6 +30,7 @@ export function InvoicePreviewLive({
   address,
   taxId,
   currency = "USD",
+  customHeaderFields = [],
 }: InvoicePreviewLiveProps) {
   return (
     <Card className="p-6 bg-white">
@@ -54,25 +57,25 @@ export function InvoicePreviewLive({
             className="border-b-4 pb-4 mb-4"
             style={{ borderColor: primaryColor }}
           >
-            <div className="flex justify-between items-start">
-              {/* Logo and company info */}
-              <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-4 items-start">
+              {/* Grid 1: Logo and company info */}
+              <div className="space-y-1">
                 {logoUrl ? (
                   <img
                     src={logoUrl}
                     alt="Logo"
-                    className="h-12 object-contain mb-2"
+                    className="h-10 object-contain mb-2"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
                   />
                 ) : (
-                  <div className="h-12 w-32 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400 mb-2">
+                  <div className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400 mb-2">
                     Sin logo
                   </div>
                 )}
                 <h1
-                  className="text-xl font-bold"
+                  className="text-sm font-bold"
                   style={{ color: primaryColor }}
                 >
                   {commercialName || legalName || "Nombre de tu empresa"}
@@ -82,41 +85,96 @@ export function InvoicePreviewLive({
                 )}
                 {taxId && (
                   <p className="text-xs text-gray-700">
-                    ID Fiscal: {taxId}
+                    <span className="font-medium">ID Fiscal:</span> {taxId}
                   </p>
                 )}
-                {email && (
-                  <p className="text-xs text-gray-600">{email}</p>
-                )}
-                {phone && (
-                  <p className="text-xs text-gray-600">{phone}</p>
-                )}
-                {address && (
-                  <p className="text-xs text-gray-600 max-w-xs">{address}</p>
-                )}
-              </div>
-
-              {/* Invoice number - sample */}
-              <div className="text-right">
-                <h2 className="text-2xl font-bold" style={{ color: primaryColor }}>
-                  FACTURA
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">#0001</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date().toLocaleDateString('es-CR')}
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">País:</span> Costa Rica
                 </p>
               </div>
+
+              {/* Grid 2: Contact info */}
+              <div className="space-y-1">
+                {/* Spacer to align with company name */}
+                <div className="h-10 mb-2" />
+                <div className="text-sm font-bold mb-1 invisible">Spacer</div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Contacto
+                </h3>
+                <div className="text-xs text-gray-600 space-y-0.5">
+                  {email ? (
+                    <p><span className="font-medium">Email:</span> {email}</p>
+                  ) : (
+                    <p><span className="font-medium">Email:</span> empresa@ejemplo.com</p>
+                  )}
+                  {phone ? (
+                    <p><span className="font-medium">Teléfono:</span> {phone}</p>
+                  ) : (
+                    <p><span className="font-medium">Teléfono:</span> +506 1234-5678</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid 3: Invoice number - sample */}
+              <div className="text-right space-y-1">
+                <h2 className="text-lg font-bold" style={{ color: primaryColor }}>
+                  FACTURA
+                </h2>
+                <div className="text-xs space-y-0.5">
+                  <p className="text-gray-600">
+                    <span className="font-medium">Número:</span> #0001
+                  </p>
+                  <p className="text-gray-600">
+                    <span className="font-medium">Fecha:</span> {new Date().toLocaleDateString('es-CR')}
+                  </p>
+                  <p className="text-gray-600">
+                    <span className="font-medium">Estado:</span> <span className="text-green-600 font-semibold">Emitida</span>
+                  </p>
+                </div>
+              </div>
             </div>
+
+            {/* Custom Header Fields */}
+            {customHeaderFields.filter(f => f.enabled).length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  {customHeaderFields
+                    .filter(f => f.enabled)
+                    .map((field) => (
+                      <div key={field.id}>
+                        <span className="font-medium">{field.label}:</span> {field.value}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Customer info - sample */}
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-              Cliente
-            </h3>
-            <div className="bg-gray-50 rounded p-3 border">
-              <p className="text-sm font-medium">Cliente de ejemplo</p>
-              <p className="text-xs text-gray-600">cliente@ejemplo.com</p>
+          <div className="mb-6 bg-gray-50 rounded p-3 border">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Facturado A
+                </h3>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">Nombre:</span> Cliente de ejemplo
+                </p>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">ID:</span> 123456789
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Contacto
+                </h3>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">Email:</span> cliente@ejemplo.com
+                </p>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">Tel(s):</span> +506 8888-8888
+                </p>
+              </div>
             </div>
           </div>
 

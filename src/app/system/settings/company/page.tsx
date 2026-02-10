@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CompanyBrandingForm } from "@/modules/company/components/CompanyBrandingForm";
 import { CompanyLegalForm } from "@/modules/company/components/CompanyLegalForm";
 import { CompanyFiscalForm } from "@/modules/company/components/CompanyFiscalForm";
+import { CompanyPaymentMethodsForm } from "@/modules/company/components/CompanyPaymentMethodsForm";
 import { useCompanyProfile, useSaveCompanyProfile } from "@/modules/company/company.hooks";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
 import { t } from "@/i18n";
@@ -88,6 +89,7 @@ export default function CompanySettingsPage() {
             <TabsTrigger value="branding">{t().companySettings.branding}</TabsTrigger>
             <TabsTrigger value="legal">{t().companySettings.legalData}</TabsTrigger>
             <TabsTrigger value="fiscal">{t().companySettings.fiscalData}</TabsTrigger>
+            <TabsTrigger value="payments">Métodos de Pago</TabsTrigger>
           </TabsList>
 
           <TabsContent value="branding">
@@ -100,6 +102,10 @@ export default function CompanySettingsPage() {
 
           <TabsContent value="fiscal">
             <CompanyFiscalForm initialData={profile.fiscal} country={profile.legal.country} />
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <CompanyPaymentMethodsForm country={profile.legal.country} />
           </TabsContent>
         </Tabs>
       )}

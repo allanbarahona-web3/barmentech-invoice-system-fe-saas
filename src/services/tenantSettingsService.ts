@@ -15,8 +15,23 @@ export const tenantSettingsService = {
     const key = `${STORAGE_KEY}:${tenantSlug}`;
     const stored = localStorage.getItem(key);
     
+    // Defaults para features (siempre aplicar para nuevas features)
+    const defaultFeatures = {
+      allowRecurringInvoices: false, // TODO: Set based on subscription plan (Premium+)
+      allowScheduledSend: false, // TODO: Set based on subscription plan (Premium+)
+      allowUnlimitedCC: false, // TODO: Set based on subscription plan (Business+)
+    };
+    
     if (stored) {
-      return JSON.parse(stored);
+      const settings = JSON.parse(stored);
+      // Merge con defaults de features para asegurar que nuevas features estén disponibles
+      return {
+        ...settings,
+        features: {
+          ...defaultFeatures,
+          ...settings.features,
+        },
+      };
     }
 
     // Retornar defaults si no existe
@@ -29,7 +44,13 @@ export const tenantSettingsService = {
       taxRate: 13,
       invoicePrefix: "INV-",
       nextInvoiceNumber: 1,
+      draftPrefix: "DRF-",
+      nextDraftNumber: 1,
+      quotePrefix: "COT-",
+      nextQuoteNumber: 1,
+      acceptedPaymentMethods: [],
       onboardingCompleted: false,
+      features: defaultFeatures,
     };
   },
 

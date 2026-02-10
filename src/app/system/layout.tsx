@@ -55,11 +55,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="flex min-h-screen bg-background print:block print:min-h-0">
             <TenantSidebar />
-            <div className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col print:block">
                 <TenantHeader />
-                <main className="flex-1 overflow-y-auto p-6">
+                <main className="flex-1 overflow-y-auto p-6 print:p-0 print:overflow-visible">
                     {children}
                 </main>
             </div>

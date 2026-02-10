@@ -2,7 +2,14 @@
 
 import type { Invoice, InvoiceInput, InvoiceItem, InvoiceEvent, PaymentTerms } from "./invoice.schema";
 import { calcInvoiceTotals } from "./invoice.calc";
-import { generateInvoiceNumber, incrementInvoiceNumber } from "./invoice.numbering";
+import { 
+  generateDraftNumber, 
+  generateQuoteNumber, 
+  generateInvoiceNumber,
+  incrementDraftNumber,
+  incrementQuoteNumber,
+  incrementInvoiceNumber 
+} from "./invoice.numbering";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
 
 const STORAGE_KEY = "invoices";
@@ -89,7 +96,7 @@ function migrateInvoices(invoices: any[]): Invoice[] {
     }
     
     // Ensure status includes new values
-    if (!["draft", "issued", "sent", "archived"].includes(invoice.status)) {
+    if (!["draft", "issued", "sent", "paid", "archived"].includes(invoice.status)) {
       invoice.status = "draft";
     }
 
@@ -112,7 +119,7 @@ function migrateInvoices(invoices: any[]): Invoice[] {
       const validEventTypes = [
         "CREATED", "CREATED_DRAFT", "UPDATED", "EXPORTED_PDF", 
         "MARKED_ISSUED", "SENT", "QUOTE_SENT", "CONVERTED_TO_INVOICE",
-        "CREATED_FROM_QUOTE", "ARCHIVED"
+        "CREATED_FROM_QUOTE", "ARCHIVED", "MARKED_PAID", "PAYMENT_REGISTERED", "PAYMENT_DELETED"
       ];
       
       // Ensure each event has required fields
@@ -242,6 +249,76 @@ function saveInvoices(invoices: Invoice[]): void {
   }
 }
 
+/**
+ * Update invoice payment status based on payments
+ * This should be called whenever a payment is created or deleted
+ */
+export async function updateInvoicePaymentStatus(
+  invoiceId: string, 
+  payments: Array<{ invoiceId: string; amount: number }>
+): Promise<void> {
+  const invoices = getStoredInvoices();
+  const invoiceIndex = invoices.findIndex(inv => inv.id === invoiceId);
+  
+  if (invoiceIndex === -1) {
+    return;
+  }
+
+  const invoice = invoices[invoiceIndex];
+  
+  // Only update payment status for invoices (not quotes)
+  if (invoice.type !== 'invoice') {
+    return;
+  }
+
+  // Calculate total paid
+  const invoicePayments = payments.filter(p => p.invoiceId === invoiceId);
+  const totalPaid = invoicePayments.reduce((sum, p) => sum + p.amount, 0);
+  const balance = invoice.total - totalPaid;
+
+  const previousStatus = invoice.status;
+  let newStatus = invoice.status;
+
+  // Determine new status based on payment
+  if (balance <= 0 && totalPaid > 0) {
+    // Fully paid - change to paid regardless of previous status (except archived)
+    if (previousStatus !== 'archived') {
+      newStatus = 'paid';
+    }
+  } else if (balance > 0 && totalPaid > 0) {
+    // Partially paid - keep as issued/sent
+    if (previousStatus === 'paid') {
+      // Was paid but payment was removed, revert to sent
+      newStatus = 'sent';
+    }
+  } else if (totalPaid === 0) {
+    // No payments - if was paid, revert to sent
+    if (previousStatus === 'paid') {
+      newStatus = 'sent';
+    }
+  }
+
+  // Update status if changed
+  if (newStatus !== previousStatus) {
+    let updatedInvoice = {
+      ...invoice,
+      status: newStatus as Invoice['status'],
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Add appropriate event
+    if (newStatus === 'paid') {
+      updatedInvoice = appendInvoiceEvent(updatedInvoice, 'MARKED_PAID', {
+        totalPaid: totalPaid.toString(),
+        paymentsCount: invoicePayments.length.toString(),
+      });
+    }
+
+    invoices[invoiceIndex] = updatedInvoice;
+    saveInvoices(invoices);
+  }
+}
+
 export async function listInvoices(): Promise<Invoice[]> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -290,8 +367,29 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     throw new Error("Tenant settings not found");
   }
 
-  // Generate invoice number
-  const invoiceNumber = await generateInvoiceNumber();
+  // Generate appropriate document number based on type and status
+  let invoiceNumber: string;
+  let incrementFunction: () => Promise<void>;
+  
+  if (input.type === "quote") {
+    // Quotes always use COT- numbering
+    invoiceNumber = await generateQuoteNumber();
+    incrementFunction = incrementQuoteNumber;
+  } else if (input.status === "draft") {
+    // Draft invoices use DRF- numbering
+    invoiceNumber = await generateDraftNumber();
+    incrementFunction = incrementDraftNumber;
+  } else {
+    // Issued invoices use official INV- numbering
+    invoiceNumber = await generateInvoiceNumber();
+    incrementFunction = incrementInvoiceNumber;
+  }
+
+  console.log('[invoice.storage] Generated document number:', {
+    number: invoiceNumber,
+    type: input.type,
+    status: input.status,
+  });
 
   // Add IDs to items
   const items: InvoiceItem[] = input.items.map(item => ({
@@ -328,7 +426,16 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     customNetDays,
     dueDate,
     events: [],
+    recurringConfig: input.recurringConfig, // Add recurring configuration
+    scheduledSend: input.scheduledSend, // Add scheduled send configuration
   };
+
+  console.log('[invoice.storage] Invoice object created with recurringConfig:', {
+    hasRecurringConfig: !!newInvoice.recurringConfig,
+    recurringEnabled: newInvoice.recurringConfig?.enabled,
+    hasScheduledSend: !!newInvoice.scheduledSend,
+    scheduledEnabled: newInvoice.scheduledSend?.enabled,
+  });
 
   // Register appropriate creation event based on status
   if (input.status === "draft") {
@@ -351,8 +458,8 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   const savedInvoice = verifyRead.find(inv => inv.id === newInvoice.id);
   console.log('[invoice.storage] createInvoice - Verification: New invoice present after save?', !!savedInvoice);
 
-  // Increment invoice number for next invoice
-  await incrementInvoiceNumber();
+  // Increment the appropriate document number counter
+  await incrementFunction();
 
   console.log('[invoice.storage] Invoice created successfully:', {
     id: newInvoice.id,
@@ -411,8 +518,18 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
     paymentTerms,
     customNetDays,
     dueDate,
+    recurringConfig: input.recurringConfig, // Update recurring configuration
+    scheduledSend: input.scheduledSend, // Update scheduled send configuration
     updatedAt: new Date().toISOString(),
   };
+
+  console.log('[invoice.storage] Invoice updated with recurringConfig:', {
+    id,
+    hasRecurringConfig: !!updatedInvoice.recurringConfig,
+    recurringEnabled: updatedInvoice.recurringConfig?.enabled,
+    hasScheduledSend: !!updatedInvoice.scheduledSend,
+    scheduledEnabled: updatedInvoice.scheduledSend?.enabled,
+  });
 
   // Register UPDATED event
   updatedInvoice = appendInvoiceEvent(updatedInvoice, "UPDATED");
@@ -451,11 +568,28 @@ export async function updateInvoiceStatus(
     throw new Error("Invoice not found");
   }
 
+  const previousStatus = invoices[index].status;
+  const previousNumber = invoices[index].invoiceNumber;
+
   let updatedInvoice: Invoice = {
     ...invoices[index],
     status,
     updatedAt: new Date().toISOString(),
   };
+
+  // If converting draft to issued, generate official invoice number
+  if (previousStatus === "draft" && status === "issued") {
+    const officialNumber = await generateInvoiceNumber();
+    updatedInvoice.invoiceNumber = officialNumber;
+    
+    console.log('[invoice.storage] Converting draft to issued:', {
+      previousNumber,
+      newNumber: officialNumber,
+    });
+    
+    // Increment official invoice counter
+    await incrementInvoiceNumber();
+  }
 
   // Register MARKED_ISSUED event if changing to issued
   if (status === "issued") {
