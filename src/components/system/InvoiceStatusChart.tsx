@@ -19,7 +19,7 @@ const STATUS_LABELS = {
     paid: "Pagadas",
     sent: "Enviadas",
     issued: "Emitidas",
-    draft: "Borradores",
+    draft: "Cotizaciones",
     archived: "Archivadas",
 };
 

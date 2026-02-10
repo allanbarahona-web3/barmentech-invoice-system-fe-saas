@@ -8,6 +8,7 @@ import { Customer } from "@/modules/customers/customer.schema";
 import { TenantSettings } from "@/schemas/tenantSettings.schema";
 import { CustomHeaderField } from "@/modules/company/company.schema";
 import { Product } from "@/modules/products/product.schema";
+import { calcTotalDiscount } from "../invoice.calc";
 // import { isCREnabled } from "@/modules/company/company.country";
 // import { buildCRFiscalSummary } from "@/country-packs/cr";
 import { t } from "@/i18n";
@@ -30,6 +31,9 @@ export function InvoicePreview({
   const { branding, legal, fiscal } = companyProfile;
   // const showCRInfo = isCREnabled(legal.country);
   const [customHeaderFields, setCustomHeaderFields] = useState<CustomHeaderField[]>([]);
+
+  // Calculate total discount
+  const totalDiscount = calcTotalDiscount(invoice.items);
 
   // Debug recurring config
   useEffect(() => {
@@ -342,18 +346,38 @@ export function InvoicePreview({
             <tbody>
               {invoice.items.map((item) => {
                 const product = item.productId ? products.find(p => p.id === item.productId) : null;
+                const lineSubtotal = item.qty * item.unitPrice;
+                const lineDiscount = lineSubtotal * ((item.discount || 0) / 100);
+                const lineTotal = lineSubtotal - lineDiscount;
+                
                 return (
                   <tr key={item.id} className="border-b border-gray-200">
                     <td className="py-3 text-gray-800">
                       {product ? product.name : "-"}
                     </td>
-                    <td className="py-3 text-gray-800">{item.description}</td>
+                    <td className="py-3 text-gray-800">
+                      {item.description}
+                      {item.discount > 0 && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Descuento: {item.discount}%
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 text-right text-gray-800">{item.qty}</td>
                     <td className="py-3 text-right text-gray-800">
                       {formatCurrency(item.unitPrice)}
                     </td>
                     <td className="py-3 text-right font-medium text-gray-900">
-                      {formatCurrency(item.qty * item.unitPrice)}
+                      {item.discount > 0 ? (
+                        <div>
+                          <div className="line-through text-gray-500 text-sm">
+                            {formatCurrency(lineSubtotal)}
+                          </div>
+                          <div>{formatCurrency(lineTotal)}</div>
+                        </div>
+                      ) : (
+                        formatCurrency(lineTotal)
+                      )}
                     </td>
                   </tr>
                 );
@@ -368,6 +392,13 @@ export function InvoicePreview({
                 <span>{t().invoicePreview.subtotal}:</span>
                 <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
               </div>
+
+              {totalDiscount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Descuento total:</span>
+                  <span className="font-medium">-{formatCurrency(totalDiscount)}</span>
+                </div>
+              )}
 
               {tenantSettings.taxEnabled && invoice.tax > 0 && (
                 <div className="flex justify-between text-gray-700">

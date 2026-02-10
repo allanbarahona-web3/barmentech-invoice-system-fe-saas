@@ -120,7 +120,7 @@ export function RevenueChart() {
                             </span>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                            Pendiente: {formatCurrency(totals.issued, settings.currency)}
+                            Por cobrar: {formatCurrency(totals.issued, settings.currency)}
                         </div>
                     </div>
                 </div>
@@ -161,7 +161,7 @@ export function RevenueChart() {
                             />
                             <Bar 
                                 dataKey="issued" 
-                                name="Pendiente" 
+                                name="Por Cobrar" 
                                 fill="#f59e0b" 
                                 radius={[4, 4, 0, 0]}
                             />

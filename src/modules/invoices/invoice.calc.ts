@@ -7,14 +7,28 @@ export interface InvoiceTotals {
 }
 
 /**
- * Calculate line total for an invoice item
+ * Calculate line total for an invoice item (including discount)
  */
 export function calcLineTotal(item: InvoiceItem): number {
-  return roundToTwo(item.qty * item.unitPrice);
+  const lineSubtotal = item.qty * item.unitPrice;
+  const discountAmount = lineSubtotal * ((item.discount || 0) / 100);
+  return roundToTwo(lineSubtotal - discountAmount);
 }
 
 /**
- * Calculate subtotal from invoice items
+ * Calculate total discount from all invoice items
+ */
+export function calcTotalDiscount(items: InvoiceItem[]): number {
+  const sum = items.reduce((acc, item) => {
+    const lineSubtotal = item.qty * item.unitPrice;
+    const discountAmount = lineSubtotal * ((item.discount || 0) / 100);
+    return acc + discountAmount;
+  }, 0);
+  return roundToTwo(sum);
+}
+
+/**
+ * Calculate subtotal from invoice items (after discounts)
  */
 export function calcSubtotal(items: InvoiceItem[]): number {
   const sum = items.reduce((acc, item) => acc + calcLineTotal(item), 0);
