@@ -8,11 +8,11 @@ import { useInvoices } from "@/modules/invoices/invoice.hooks";
 import { Badge } from "@/components/ui/badge";
 
 const STATUS_COLORS = {
-    paid: "hsl(var(--chart-2))",      // green
-    sent: "hsl(var(--chart-4))",      // yellow/amber
-    issued: "hsl(var(--chart-4))",    // yellow/amber
-    draft: "hsl(var(--chart-3))",     // gray
-    archived: "hsl(var(--chart-5))",  // muted
+    paid: "#10b981",      // green
+    sent: "#3b82f6",      // blue
+    issued: "#8b5cf6",    // purple
+    draft: "#6b7280",     // gray
+    archived: "#9ca3af",  // light gray
 };
 
 const STATUS_LABELS = {
@@ -106,8 +106,10 @@ export function InvoiceStatusChart() {
                                     labelLine={false}
                                     label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                                     outerRadius={80}
+                                    innerRadius={40}
                                     fill="#8884d8"
                                     dataKey="value"
+                                    paddingAngle={2}
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />

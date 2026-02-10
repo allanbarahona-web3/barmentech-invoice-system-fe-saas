@@ -133,15 +133,15 @@ export function RevenueChart() {
                 ) : (
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                             <XAxis 
                                 dataKey="month" 
                                 className="text-xs"
-                                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                                tick={{ fill: '#6b7280', fontSize: 12 }}
                             />
                             <YAxis 
                                 className="text-xs"
-                                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                                tick={{ fill: '#6b7280', fontSize: 12 }}
                                 tickFormatter={(value) => {
                                     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                                     if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
@@ -150,19 +150,19 @@ export function RevenueChart() {
                             />
                             <Tooltip content={<CustomTooltip />} />
                             <Legend 
-                                wrapperStyle={{ paddingTop: '20px' }}
+                                wrapperStyle={{ paddingTop: '20px', fontSize: '14px' }}
                                 iconType="circle"
                             />
                             <Bar 
                                 dataKey="paid" 
                                 name="Pagado" 
-                                fill="hsl(var(--chart-2))" 
+                                fill="#10b981" 
                                 radius={[4, 4, 0, 0]}
                             />
                             <Bar 
                                 dataKey="issued" 
                                 name="Pendiente" 
-                                fill="hsl(var(--chart-4))" 
+                                fill="#f59e0b" 
                                 radius={[4, 4, 0, 0]}
                             />
                         </BarChart>
