@@ -120,6 +120,7 @@ export default function NewInvoicePage() {
           productId: undefined,
         },
       ],
+      deliveryFee: 0,
       status: "draft",
     },
   });
@@ -174,6 +175,7 @@ export default function NewInvoicePage() {
   const watchType = form.watch("type");
   const watchPaymentTerms = form.watch("paymentTerms");
   const watchCurrency = form.watch("currency");
+  const watchDeliveryFee = form.watch("deliveryFee");
   
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -192,7 +194,8 @@ export default function NewInvoicePage() {
     ? (subtotal * ((settings.taxRate ?? 0) / 100))
     : 0;
 
-  const total = subtotal + taxAmount;
+  const deliveryFee = Number.isFinite(watchDeliveryFee) ? watchDeliveryFee : 0;
+  const total = subtotal + taxAmount + deliveryFee;
 
   // Format currency based on selected currency in form
   const formatMoney = (amount: number) => {
@@ -1116,6 +1119,27 @@ export default function NewInvoicePage() {
                   <span className="font-medium">{formatMoney(taxAmount)}</span>
                 </div>
               )}
+              <FormField
+                control={form.control}
+                name="deliveryFee"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between text-sm">
+                    <FormLabel className="text-muted-foreground">
+                      {t().invoices.deliveryFee}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-32 text-right"
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>{t().invoices.total}</span>
                 <span>{formatMoney(total)}</span>

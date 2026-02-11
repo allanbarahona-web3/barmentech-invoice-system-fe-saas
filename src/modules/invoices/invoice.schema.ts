@@ -83,6 +83,7 @@ export const invoiceSchema = z.object({
   items: z.array(invoiceItemSchema),
   subtotal: z.number(),
   tax: z.number(),
+  deliveryFee: z.number().default(0),
   total: z.number(),
   status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
   createdAt: z.string(),
@@ -122,6 +123,7 @@ export const invoiceInputSchema = z
         })
       )
       .min(1),
+    deliveryFee: z.number().min(0).default(0),
     status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
     recurringConfig: recurringConfigSchema.optional(),
     scheduledSend: scheduledSendSchema.optional(),

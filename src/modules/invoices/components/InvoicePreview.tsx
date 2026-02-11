@@ -41,6 +41,9 @@ export function InvoicePreview({
   const showConversion = baseCurrency && baseCurrency !== invoice.currency && invoice.exchangeRate;
   const convertedSubtotal = showConversion ? convertCurrency(invoice.subtotal, invoice.currency, baseCurrency) : null;
   const convertedTax = showConversion ? convertCurrency(invoice.tax, invoice.currency, baseCurrency) : null;
+  const convertedDeliveryFee = showConversion
+    ? convertCurrency(invoice.deliveryFee || 0, invoice.currency, baseCurrency)
+    : null;
   const convertedTotal = showConversion ? convertCurrency(invoice.total, invoice.currency, baseCurrency) : null;
 
   // Debug recurring config
@@ -500,6 +503,23 @@ export function InvoicePreview({
                           style: "currency",
                           currency: baseCurrency,
                         }).format(convertedTax)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {invoice.deliveryFee > 0 && (
+                <div className="flex justify-between text-gray-700">
+                  <span>{t().invoicePreview.deliveryFee}:</span>
+                  <div className="text-right">
+                    <div className="font-medium">{formatCurrency(invoice.deliveryFee)}</div>
+                    {showConversion && convertedDeliveryFee !== null && baseCurrency && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        ≈ {new Intl.NumberFormat("es-CR", {
+                          style: "currency",
+                          currency: baseCurrency,
+                        }).format(convertedDeliveryFee)}
                       </div>
                     )}
                   </div>

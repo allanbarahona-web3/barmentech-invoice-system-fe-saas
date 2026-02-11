@@ -166,6 +166,9 @@ function migrateInvoices(invoices: any[]): Invoice[] {
     if (typeof invoice.tax !== 'number') {
       invoice.tax = 0;
     }
+    if (typeof invoice.deliveryFee !== 'number') {
+      invoice.deliveryFee = 0;
+    }
     if (typeof invoice.total !== 'number') {
       invoice.total = 0;
     }
@@ -423,10 +426,11 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   }));
 
   // Calculate totals
-  const { subtotal, tax, total } = calcInvoiceTotals(
+  const { subtotal, tax, deliveryFee, total } = calcInvoiceTotals(
     items,
     settings.taxEnabled,
-    settings.taxRate ?? 0
+    settings.taxRate ?? 0,
+    input.deliveryFee ?? 0
   );
 
   const now = new Date().toISOString();
@@ -443,6 +447,7 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     items,
     subtotal,
     tax,
+    deliveryFee,
     total,
     status: input.status,
     createdAt: now,
@@ -528,10 +533,11 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
   }));
 
   // Recalculate totals
-  const { subtotal, tax, total } = calcInvoiceTotals(
+  const { subtotal, tax, deliveryFee, total } = calcInvoiceTotals(
     items,
     settings.taxEnabled,
-    settings.taxRate ?? 0
+    settings.taxRate ?? 0,
+    typeof input.deliveryFee === "number" ? input.deliveryFee : invoices[index].deliveryFee ?? 0
   );
 
   const paymentTerms: PaymentTerms = input.paymentTerms || invoices[index].paymentTerms || "due_on_receipt";
@@ -544,6 +550,7 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
     items,
     subtotal,
     tax,
+    deliveryFee,
     total,
     status: input.status,
     paymentTerms,
@@ -777,6 +784,7 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
     items,
     subtotal: quote.subtotal,
     tax: quote.tax,
+    deliveryFee: quote.deliveryFee ?? 0,
     total: quote.total,
     status: "draft",
     originQuoteId: quoteId, // Link back to original quote

@@ -3,6 +3,7 @@ import { InvoiceItem } from "./invoice.schema";
 export interface InvoiceTotals {
   subtotal: number;
   tax: number;
+  deliveryFee: number;
   total: number;
 }
 
@@ -52,13 +53,15 @@ export function calcTax(subtotal: number, taxEnabled: boolean, taxRate: number):
 export function calcInvoiceTotals(
   items: InvoiceItem[],
   taxEnabled: boolean,
-  taxRate: number
+  taxRate: number,
+  deliveryFee: number = 0
 ): InvoiceTotals {
   const subtotal = calcSubtotal(items);
   const tax = calcTax(subtotal, taxEnabled, taxRate);
-  const total = roundToTwo(subtotal + tax);
+  const normalizedDeliveryFee = roundToTwo(deliveryFee);
+  const total = roundToTwo(subtotal + tax + normalizedDeliveryFee);
 
-  return { subtotal, tax, total };
+  return { subtotal, tax, deliveryFee: normalizedDeliveryFee, total };
 }
 
 /**

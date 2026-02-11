@@ -342,6 +342,7 @@ export const en = {
     totalsSection: "Totals",
     subtotal: "Subtotal",
     tax: "Tax",
+    deliveryFee: "Home delivery",
     total: "Total",
     // CTAs
     previewButton: "Preview",
@@ -392,6 +393,7 @@ export const en = {
     unitPrice: "Unit Price",
     amount: "Amount",
     subtotal: "Subtotal",
+    deliveryFee: "Home delivery",
     total: "Total",
     taxpayerType: "Taxpayer type",
     activityCode: "Activity code",

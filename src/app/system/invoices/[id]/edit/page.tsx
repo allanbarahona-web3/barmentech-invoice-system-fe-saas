@@ -114,6 +114,7 @@ export default function EditInvoicePage() {
           productId: undefined,
         },
       ],
+      deliveryFee: 0,
       status: "draft",
     },
   });
@@ -128,6 +129,7 @@ export default function EditInvoicePage() {
         paymentTerms: invoice.paymentTerms,
         customNetDays: invoice.customNetDays,
         items: invoice.items,
+        deliveryFee: invoice.deliveryFee ?? 0,
         status: invoice.status,
       });
       
@@ -184,6 +186,7 @@ export default function EditInvoicePage() {
 
   const watchItems = form.watch("items");
   const watchPaymentTerms = form.watch("paymentTerms");
+  const watchDeliveryFee = form.watch("deliveryFee");
 
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -202,7 +205,8 @@ export default function EditInvoicePage() {
     ? (subtotal * ((settings.taxRate ?? 0) / 100))
     : 0;
 
-  const total = subtotal + taxAmount;
+  const deliveryFee = Number.isFinite(watchDeliveryFee) ? watchDeliveryFee : 0;
+  const total = subtotal + taxAmount + deliveryFee;
 
   const addItem = () => {
     append({
@@ -1036,6 +1040,27 @@ export default function EditInvoicePage() {
                   <span className="font-medium">{settings.currency} {taxAmount.toFixed(2)}</span>
                 </div>
               )}
+              <FormField
+                control={form.control}
+                name="deliveryFee"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between text-sm">
+                    <FormLabel className="text-muted-foreground">
+                      {t().invoices.deliveryFee}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-32 text-right"
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>{t().invoices.total}</span>
                 <span>{settings?.currency} {total.toFixed(2)}</span>
