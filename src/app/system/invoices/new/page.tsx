@@ -198,6 +198,7 @@ export default function NewInvoicePage() {
       navigateToPreview,
       type: data.type,
       customerId: data.customerId,
+      currency: data.currency,
       itemsCount: data.items.length,
       recurringEnabled,
     });
@@ -209,11 +210,18 @@ export default function NewInvoicePage() {
       return;
     }
 
-    // Ensure type field has a value (fallback to "invoice" if undefined due to schema default)
+    // Ensure type field and currency have values
     const invoiceData: InvoiceInput = {
       ...data,
       type: data.type || "invoice",
+      currency: data.currency || defaultCurrency, // Explicitly set currency
     };
+
+    console.log('[NewInvoicePage] Invoice data with currency:', {
+      currency: invoiceData.currency,
+      defaultCurrency,
+      original: data.currency,
+    });
 
     // Add recurring configuration if enabled
     if (recurringEnabled && settings?.features?.allowRecurringInvoices) {

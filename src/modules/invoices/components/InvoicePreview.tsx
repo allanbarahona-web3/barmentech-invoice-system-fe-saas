@@ -45,12 +45,15 @@ export function InvoicePreview({
 
   // Debug recurring config
   useEffect(() => {
-    console.log('[InvoicePreview] Invoice recurring config:', {
+    console.log('[InvoicePreview] Rendering with invoice data:', {
+      id: invoice.id,
+      currency: invoice.currency,
+      legalCurrency: legal.currency,
       hasRecurringConfig: !!invoice.recurringConfig,
       enabled: invoice.recurringConfig?.enabled,
       fullConfig: invoice.recurringConfig,
     });
-  }, [invoice.recurringConfig]);
+  }, [invoice.recurringConfig, invoice.currency, legal.currency, invoice.id]);
 
   // Load custom header fields from localStorage
   useEffect(() => {

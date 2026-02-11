@@ -355,6 +355,7 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     type: input.type,
     status: input.status,
     customerId: input.customerId,
+    currency: input.currency,
     itemsCount: input.items.length,
   });
 
@@ -456,7 +457,11 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
     scheduledSend: input.scheduledSend, // Add scheduled send configuration
   };
 
-  console.log('[invoice.storage] Invoice object created with recurringConfig:', {
+  console.log('[invoice.storage] Invoice object created:', {
+    id: newInvoice.id,
+    currency: newInvoice.currency,
+    inputCurrency: input.currency,
+    settingsCurrency: settings.currency,
     hasRecurringConfig: !!newInvoice.recurringConfig,
     recurringEnabled: newInvoice.recurringConfig?.enabled,
     hasScheduledSend: !!newInvoice.scheduledSend,
