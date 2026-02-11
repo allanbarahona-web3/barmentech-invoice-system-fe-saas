@@ -173,6 +173,7 @@ export default function NewInvoicePage() {
   const watchItems = form.watch("items");
   const watchType = form.watch("type");
   const watchPaymentTerms = form.watch("paymentTerms");
+  const watchCurrency = form.watch("currency");
   
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -192,6 +193,36 @@ export default function NewInvoicePage() {
     : 0;
 
   const total = subtotal + taxAmount;
+
+  // Format currency based on selected currency in form
+  const formatMoney = (amount: number) => {
+    const currency = watchCurrency || defaultCurrency;
+    
+    const localeMap: Record<string, string> = {
+      'USD': 'en-US',
+      'CRC': 'es-CR',
+      'EUR': 'de-DE',
+      'GBP': 'en-GB',
+      'MXN': 'es-MX',
+      'ARS': 'es-AR',
+      'BRL': 'pt-BR',
+      'CLP': 'es-CL',
+      'COP': 'es-CO',
+    };
+    
+    const locale = localeMap[currency] || 'en-US';
+    
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch (error) {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  };
 
   const onSubmit = (data: InvoiceInput, navigateToPreview = false) => {
     console.log('[NewInvoicePage] onSubmit called:', {
@@ -942,7 +973,7 @@ export default function NewInvoicePage() {
                                             <div className="flex flex-col items-start flex-1 min-w-0 text-left">
                                               <span className="truncate w-full font-medium">{product.name}</span>
                                               <span className="text-xs text-muted-foreground">
-                                                {settings?.currency} {product.price.toFixed(2)}
+                                                {formatMoney(product.price)}
                                               </span>
                                             </div>
                                           </Button>
@@ -1041,7 +1072,7 @@ export default function NewInvoicePage() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {settings?.currency} {lineTotal.toFixed(2)}
+                          {formatMoney(lineTotal)}
                         </TableCell>
                         <TableCell>
                           {fields.length > 1 && (
@@ -1069,12 +1100,12 @@ export default function NewInvoicePage() {
             <div className="space-y-2 max-w-sm ml-auto">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t().invoices.subtotal}</span>
-                <span className="font-medium">{settings?.currency} {subtotal.toFixed(2)}</span>
+                <span className="font-medium">{formatMoney(subtotal)}</span>
               </div>
               {totalDiscount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Descuento</span>
-                  <span className="font-medium text-red-600">-{settings?.currency} {totalDiscount.toFixed(2)}</span>
+                  <span className="font-medium text-red-600">-{formatMoney(totalDiscount)}</span>
                 </div>
               )}
               {settings?.taxEnabled && (
@@ -1082,12 +1113,12 @@ export default function NewInvoicePage() {
                   <span className="text-muted-foreground">
                     {settings.taxName} ({settings.taxRate}%)
                   </span>
-                  <span className="font-medium">{settings.currency} {taxAmount.toFixed(2)}</span>
+                  <span className="font-medium">{formatMoney(taxAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>{t().invoices.total}</span>
-                <span>{settings?.currency} {total.toFixed(2)}</span>
+                <span>{formatMoney(total)}</span>
               </div>
             </div>
           </Card>

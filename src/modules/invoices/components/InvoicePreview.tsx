@@ -100,12 +100,40 @@ export function InvoicePreview({
     return labels[frequency] || frequency;
   };
 
-  // Format currency
+  // Format currency - use appropriate locale based on currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-CR", {
-      style: "currency",
-      currency: invoice.currency || legal.currency,
-    }).format(amount);
+    const currencyToFormat = invoice.currency || legal.currency;
+    
+    // Map currencies to appropriate locales for better formatting
+    const localeMap: Record<string, string> = {
+      'USD': 'en-US',
+      'CRC': 'es-CR',
+      'EUR': 'de-DE',
+      'GBP': 'en-GB',
+      'MXN': 'es-MX',
+      'ARS': 'es-AR',
+      'BRL': 'pt-BR',
+      'CLP': 'es-CL',
+      'COP': 'es-CO',
+    };
+    
+    const locale = localeMap[currencyToFormat] || 'en-US';
+    
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: currencyToFormat,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch (error) {
+      // Fallback if currency is not supported
+      console.error(`[InvoicePreview] Error formatting ${currencyToFormat}:`, error);
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount) + ` ${currencyToFormat}`;
+    }
   };
 
   // Format date
