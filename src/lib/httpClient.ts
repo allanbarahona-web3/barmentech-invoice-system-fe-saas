@@ -1,8 +1,9 @@
 "use client";
 
 import axios, { AxiosInstance, AxiosError } from "axios";
-import { getAccessToken, deleteAccessToken } from "./authContext";
+import { getAccessToken, clearAuthContext, getRole } from "./authContext";
 import { getTenantId, getTenantSlug, clearTenantContext } from "./tenantContext";
+import { Role } from "./rbacEngine";
 
 let httpClientInstance: AxiosInstance | null = null;
 
@@ -64,11 +65,16 @@ export function getHttpClient(): AxiosInstance {
                 // Only execute in browser environment
                 if (typeof window !== "undefined") {
                     // Clear auth and tenant context
-                    deleteAccessToken();
+                    clearAuthContext();
                     clearTenantContext();
 
-                    // Redirect to login
-                    window.location.href = "/login";
+                    // Redirect based on role/context
+                    const role = getRole();
+                    if (role === Role.SUPER_ADMIN || window.location.pathname.startsWith('/platform-admin')) {
+                        window.location.href = "/platform-admin/login";
+                    } else {
+                        window.location.href = "/login";
+                    }
                 }
             }
 

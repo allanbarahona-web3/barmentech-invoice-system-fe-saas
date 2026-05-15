@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Search, ChevronDown, LogOut, Shield } from "lucide-react";
-import { clearAuthContext, getRole } from "@/lib/authContext";
+import { clearAuthContext, getRefreshToken, getRole } from "@/lib/authContext";
 import { clearTenantContext } from "@/lib/tenantContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getRoleDisplayName } from "@/lib/rbacEngine";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { t } from "@/i18n";
+import { platformAdminService } from "@/services/platformAdminService";
 
 export function PlatformHeader() {
     const router = useRouter();
@@ -30,10 +31,20 @@ export function PlatformHeader() {
         }
     }, []);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        const refreshToken = getRefreshToken();
+
+        if (refreshToken) {
+            try {
+                await platformAdminService.logout(refreshToken);
+            } catch {
+                // Ignore network/logout errors and clear local auth anyway.
+            }
+        }
+
         clearAuthContext();
         clearTenantContext();
-        router.push("/login");
+        router.push("/platform-admin/login");
     };
 
     return (

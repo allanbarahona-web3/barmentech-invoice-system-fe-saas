@@ -18,12 +18,13 @@ import {
 import { loginSchema, type LoginFormData } from "@/schemas/login.schema";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks";
-import { setAccessToken, setRole } from "@/lib/authContext";
+import { setAccessToken, setRefreshToken, setRole } from "@/lib/authContext";
 import { setTenantContext } from "@/lib/tenantContext";
 import { Role } from "@/lib/rbacEngine";
 import { t } from "@/i18n";
 import { hasTwoFactorEnabled } from "@/modules/auth/twoFactor.storage";
 import { TwoFactorVerifyDialog } from "@/modules/auth/components/TwoFactorVerifyDialog";
+import { platformAdminService } from "@/services/platformAdminService";
 
 export function LoginForm() {
     const router = useRouter();
@@ -61,19 +62,33 @@ export function LoginForm() {
         }
 
         try {
-            // Simulated backend call
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
             // Determine role based on email
             const emailLower = data.email.toLowerCase();
             let role: Role = Role.TENANT_ADMIN;
 
-            if (emailLower.includes("admin")) {
+            if (emailLower === "admin@barmentech.com") {
                 role = Role.SUPER_ADMIN;
             } else if (emailLower.includes("accountant")) {
                 role = Role.ACCOUNTANT;
             } else if (emailLower.includes("viewer")) {
                 role = Role.VIEWER;
+            }
+
+            if (role === Role.SUPER_ADMIN) {
+                const auth = await platformAdminService.login(data.email, data.password);
+
+                setAccessToken(auth.accessToken);
+                setRefreshToken(auth.refreshToken);
+                setRole(Role.SUPER_ADMIN);
+
+                toast({
+                    title: "Inicio exitoso",
+                    description: "Bienvenido al panel de plataforma",
+                });
+
+                router.push("/platform-admin/dashboard");
+                form.reset();
+                return;
             }
 
             // Check if user has 2FA enabled

@@ -1,25 +1,54 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Building2, Users, TrendingUp, Activity } from "lucide-react";
+import {
+    platformAdminService,
+    PlatformTenant,
+} from "@/services/platformAdminService";
 
 export default function PlatformAdminDashboardPage() {
+    const [tenants, setTenants] = useState<PlatformTenant[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const data = await platformAdminService.listTenants();
+                setTenants(data);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        load();
+    }, []);
+
+    const stats = useMemo(() => {
+        const active = tenants.filter((t) => t.status === "active").length;
+        const suspended = tenants.filter((t) => t.status === "suspended").length;
+        return { total: tenants.length, active, suspended };
+    }, [tenants]);
+
     const metrics = [
         {
             label: "Total Tenants",
-            value: "24",
+            value: String(stats.total),
             icon: <Building2 className="w-6 h-6 text-blue-500" />,
-            trend: { value: 3, label: "this month", positive: true },
+            trend: { value: stats.active, label: "active", positive: true },
         },
         {
             label: "Total Users",
-            value: "156",
+            value: "-",
             icon: <Users className="w-6 h-6 text-purple-500" />,
-            trend: { value: 12, label: "active now", positive: true },
+            trend: { value: 0, label: "coming soon", positive: true },
         },
         {
-            label: "Monthly Revenue",
-            value: "$45,231",
+            label: "Suspended Tenants",
+            value: String(stats.suspended),
             icon: <TrendingUp className="w-6 h-6 text-green-500" />,
-            trend: { value: 8, label: "vs last month", positive: true },
+            trend: { value: stats.suspended, label: "need review", positive: false },
         },
         {
             label: "System Health",
@@ -34,7 +63,9 @@ export default function PlatformAdminDashboardPage() {
             <div>
                 <h2 className="text-3xl font-bold">Welcome back!</h2>
                 <p className="text-muted-foreground">
-                    Platform overview and system status
+                    {isLoading
+                        ? "Loading platform metrics..."
+                        : "Platform overview and system status"}
                 </p>
             </div>
 

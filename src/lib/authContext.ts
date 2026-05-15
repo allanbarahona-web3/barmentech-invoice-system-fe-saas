@@ -4,6 +4,7 @@ import { getCookie, setCookie, deleteCookie } from "./cookieManager";
 import { Role } from "./rbacEngine";
 
 const TOKEN_COOKIE_NAME = "accessToken";
+const REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
 const ROLE_COOKIE_NAME = "role";
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
@@ -24,6 +25,32 @@ export function setAccessToken(token: string): void {
         secure: true,
         sameSite: "Lax",
     });
+}
+
+/**
+ * Get the refresh token from cookies
+ */
+export function getRefreshToken(): string | null {
+    return getCookie(REFRESH_TOKEN_COOKIE_NAME);
+}
+
+/**
+ * Set the refresh token in cookies
+ */
+export function setRefreshToken(token: string): void {
+    setCookie(REFRESH_TOKEN_COOKIE_NAME, token, {
+        maxAge: TOKEN_MAX_AGE,
+        path: "/",
+        secure: true,
+        sameSite: "Lax",
+    });
+}
+
+/**
+ * Delete refresh token from cookies
+ */
+export function deleteRefreshToken(): void {
+    deleteCookie(REFRESH_TOKEN_COOKIE_NAME, { path: "/" });
 }
 
 /**
@@ -76,5 +103,6 @@ export function isAuthenticated(): boolean {
  */
 export function clearAuthContext(): void {
     deleteAccessToken();
+    deleteRefreshToken();
     deleteRole();
 }

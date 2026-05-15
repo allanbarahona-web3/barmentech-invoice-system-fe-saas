@@ -3,6 +3,7 @@
 import { PlatformSidebar } from "@/components/platform-admin/PlatformSidebar";
 import { PlatformHeader } from "@/components/platform-admin/PlatformHeader";
 import { PlatformAdminGuard } from "@/lib/routeGuards";
+import { usePathname } from "next/navigation";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
     return (
@@ -23,8 +24,14 @@ export default function PlatformAdminLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const pathname = usePathname();
+
+    if (pathname === "/platform-admin/login") {
+        return <>{children}</>;
+    }
+
     return (
-        <PlatformAdminGuard>
+        <PlatformAdminGuard fallbackPath="/platform-admin/login">
             <LayoutContent>{children}</LayoutContent>
         </PlatformAdminGuard>
     );

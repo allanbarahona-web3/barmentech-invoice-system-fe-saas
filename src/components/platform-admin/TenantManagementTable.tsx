@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { t } from "@/i18n";
 
 import {
@@ -13,84 +14,79 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks";
+import {
+    platformAdminService,
+    PlatformTenant,
+} from "@/services/platformAdminService";
 
-interface Tenant {
-    id: string;
-    name: string;
-    slug: string;
-    plan: "starter" | "professional" | "enterprise";
-    status: "active" | "inactive" | "suspended";
-    invoices: number;
-    revenue: string;
-}
-
-const tenants: Tenant[] = [
-    {
-        id: "tenant_001",
-        name: "Acme Corporation",
-        slug: "acme-corporation",
-        plan: "professional",
-        status: "active",
-        invoices: 127,
-        revenue: "$45,231",
-    },
-    {
-        id: "tenant_002",
-        name: "Tech Solutions Inc",
-        slug: "tech-solutions",
-        plan: "enterprise",
-        status: "active",
-        invoices: 543,
-        revenue: "$156,480",
-    },
-    {
-        id: "tenant_003",
-        name: "Global Services Ltd",
-        slug: "global-services",
-        plan: "starter",
-        status: "active",
-        invoices: 34,
-        revenue: "$8,920",
-    },
-    {
-        id: "tenant_004",
-        name: "Digital Ventures",
-        slug: "digital-ventures",
-        plan: "professional",
-        status: "inactive",
-        invoices: 89,
-        revenue: "$32,100",
-    },
-    {
-        id: "tenant_005",
-        name: "Innovation Labs",
-        slug: "innovation-labs",
-        plan: "enterprise",
-        status: "active",
-        invoices: 287,
-        revenue: "$124,560",
-    },
-];
-
-function getPlanBadge(plan: Tenant["plan"]) {
-    const colors = {
-        starter: "bg-blue-100 text-blue-800",
-        professional: "bg-purple-100 text-purple-800",
-        enterprise: "bg-yellow-100 text-yellow-800",
-    };
-    return colors[plan];
-}
-
-function getStatusBadge(status: Tenant["status"]) {
+function getStatusBadge(status: PlatformTenant["status"]) {
     const colors = {
         active: "bg-green-100 text-green-800",
-        inactive: "bg-gray-100 text-gray-800",
+        trial: "bg-blue-100 text-blue-800",
         suspended: "bg-red-100 text-red-800",
+        cancelled: "bg-gray-100 text-gray-800",
     };
     return colors[status];
 }
 
 export function TenantManagementTable() {
+    const [tenants, setTenants] = useState<PlatformTenant[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [actionId, setActionId] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    const fetchTenants = async () => {
+        setIsLoading(true);
+        try {
+            const data = await platformAdminService.listTenants();
+            setTenants(data);
+        } catch {
+            toast({
+                title: "Error",
+                description: "No se pudieron cargar los tenants",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTenants();
+    }, []);
+
+    const toggleTenantStatus = async (tenant: PlatformTenant) => {
+        setActionId(tenant.id);
+        try {
+            if (tenant.status === "suspended") {
+                await platformAdminService.activateTenant(tenant.id);
+            } else {
+                await platformAdminService.suspendTenant(
+                    tenant.id,
+                    "Suspension triggered from platform admin FE",
+                );
+            }
+
+            await fetchTenants();
+            toast({
+                title: "Éxito",
+                description:
+                    tenant.status === "suspended"
+                        ? "Tenant activado"
+                        : "Tenant suspendido",
+            });
+        } catch {
+            toast({
+                title: "Error",
+                description: "No se pudo actualizar el estado del tenant",
+                variant: "destructive",
+            });
+        } finally {
+            setActionId(null);
+        }
+    };
+
     return (
         <Card className="p-6">
             <div className="space-y-4">
@@ -98,10 +94,12 @@ export function TenantManagementTable() {
                     <div>
                         <h2 className="text-lg font-semibold">Tenants</h2>
                         <p className="text-sm text-muted-foreground">
-                            Manage all platform tenants
+                            Manage all platform tenants (live data)
                         </p>
                     </div>
-                    <Button size="sm">Add Tenant</Button>
+                    <Button size="sm" onClick={fetchTenants} disabled={isLoading}>
+                        Refresh
+                    </Button>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -110,14 +108,29 @@ export function TenantManagementTable() {
                             <TableRow>
                                 <TableHead>Tenant Name</TableHead>
                                 <TableHead>Slug</TableHead>
-                                <TableHead>Plan</TableHead>
+                                <TableHead>Country</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>{t().common.invoices}</TableHead>
-                                <TableHead>Revenue</TableHead>
+                                <TableHead>Created</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                        Loading tenants...
+                                    </TableCell>
+                                </TableRow>
+                            )}
+
+                            {!isLoading && tenants.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                        No tenants found
+                                    </TableCell>
+                                </TableRow>
+                            )}
+
                             {tenants.map((tenant) => (
                                 <TableRow key={tenant.id}>
                                     <TableCell className="font-medium">
@@ -126,15 +139,7 @@ export function TenantManagementTable() {
                                     <TableCell className="text-muted-foreground">
                                         {tenant.slug}
                                     </TableCell>
-                                    <TableCell>
-                                        <Badge
-                                            variant="outline"
-                                            className={getPlanBadge(tenant.plan)}
-                                        >
-                                            {tenant.plan.charAt(0).toUpperCase() +
-                                                tenant.plan.slice(1)}
-                                        </Badge>
-                                    </TableCell>
+                                    <TableCell>{tenant.countryCode || "-"}</TableCell>
                                     <TableCell>
                                         <Badge
                                             variant="outline"
@@ -144,13 +149,19 @@ export function TenantManagementTable() {
                                                 tenant.status.slice(1)}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{tenant.invoices}</TableCell>
-                                    <TableCell className="font-semibold">
-                                        {tenant.revenue}
+                                    <TableCell>
+                                        {new Date(tenant.createdAt).toLocaleDateString()}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button variant="ghost" size="sm">
-                                            View
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={actionId === tenant.id}
+                                            onClick={() => toggleTenantStatus(tenant)}
+                                        >
+                                            {tenant.status === "suspended"
+                                                ? "Activate"
+                                                : "Suspend"}
                                         </Button>
                                     </TableCell>
                                 </TableRow>
