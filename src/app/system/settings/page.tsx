@@ -26,6 +26,7 @@ export default function SettingsPage() {
     const [countryPackCR, setCountryPackCR] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [tenantCountry, setTenantCountry] = useState<string>('');
+    const [tenantSettings, setTenantSettings] = useState<Awaited<ReturnType<typeof tenantSettingsService.getTenantSettings>>>(null);
 
     // Load tenant settings and country pack status
     useEffect(() => {
@@ -34,18 +35,11 @@ export default function SettingsPage() {
                 // Get tenant's country
                 const settings = await tenantSettingsService.getTenantSettings();
                 if (settings) {
+                    setTenantSettings(settings);
                     setTenantCountry(settings.country);
-                    
-                    // Load country pack status for tenant's country
-                    const countryCode = settings.country.toLowerCase();
-                    const saved = localStorage.getItem(`countryPack:${countryCode}`);
-                    if (saved !== null) {
-                        setCountryPackCR(JSON.parse(saved));
-                    } else {
-                        // Auto-enable if it's the tenant's country
-                        setCountryPackCR(true);
-                        localStorage.setItem(`countryPack:${countryCode}`, JSON.stringify(true));
-                    }
+
+                    const enabled = settings.countryPack?.enabled ?? true;
+                    setCountryPackCR(enabled);
                 }
             } catch (error) {
                 console.error('Error loading settings:', error);
@@ -57,12 +51,28 @@ export default function SettingsPage() {
         loadSettings();
     }, []);
 
-    // Save to localStorage
-    const handleToggleCR = () => {
-        const countryCode = tenantCountry.toLowerCase();
+    // Persist in tenant settings (backend-ready); localStorage fallback is handled by service for compatibility
+    const handleToggleCR = async () => {
+        if (!tenantSettings) return;
+
         const newValue = !countryPackCR;
         setCountryPackCR(newValue);
-        localStorage.setItem(`countryPack:${countryCode}`, JSON.stringify(newValue));
+
+        try {
+            const updated = await tenantSettingsService.saveTenantSettings({
+                ...tenantSettings,
+                countryPack: {
+                    code: tenantCountry.toUpperCase(),
+                    enabled: newValue,
+                    source: "backend",
+                },
+            });
+
+            setTenantSettings(updated);
+        } catch (error) {
+            console.error("Error saving country pack settings:", error);
+            setCountryPackCR(!newValue);
+        }
     };
 
     // Find the country pack for the tenant's country
@@ -91,7 +101,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Premium Features Section */}
-            <Card className="border-2 bg-gradient-to-br from-amber-500/5 to-purple-600/5 border-amber-500/30 hover:border-amber-500/50 transition-colors">
+            <Card className="border-2 bg-linear-to-br from-amber-500/5 to-purple-600/5 border-amber-500/30 hover:border-amber-500/50 transition-colors">
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-amber-500" />
@@ -111,7 +121,7 @@ export default function SettingsPage() {
                                 <li>Ahorra tiempo y automatiza cobros</li>
                             </ul>
                         </div>
-                        <Button asChild className="w-full bg-gradient-to-r from-amber-500 to-purple-600 hover:from-amber-600 hover:to-purple-700">
+                        <Button asChild className="w-full bg-linear-to-r from-amber-500 to-purple-600 hover:from-amber-600 hover:to-purple-700">
                             <Link href="/system/settings/features">
                                 <Sparkles className="h-4 w-4 mr-2" />
                                 Ver características Premium

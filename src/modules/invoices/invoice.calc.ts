@@ -1,4 +1,6 @@
 import { InvoiceItem } from "./invoice.schema";
+import { calculateTaxAmount, getResolvedTaxConfig } from "@/lib/taxConfig";
+import { TenantSettings } from "@/schemas/tenantSettings.schema";
 
 export interface InvoiceTotals {
   subtotal: number;
@@ -39,25 +41,15 @@ export function calcSubtotal(items: InvoiceItem[]): number {
 /**
  * Calculate tax amount based on subtotal and tax settings
  */
-export function calcTax(subtotal: number, taxEnabled: boolean, taxRate: number): number {
-  if (!taxEnabled || taxRate <= 0) {
-    return 0;
-  }
-  const taxAmount = subtotal * (taxRate / 100);
-  return roundToTwo(taxAmount);
-}
-
-/**
- * Calculate invoice totals
- */
 export function calcInvoiceTotals(
   items: InvoiceItem[],
-  taxEnabled: boolean,
-  taxRate: number,
+  tenantSettings: Pick<TenantSettings, "taxEnabled" | "taxName" | "taxRate" | "country">,
+  countryCode?: string,
   deliveryFee: number = 0
 ): InvoiceTotals {
   const subtotal = calcSubtotal(items);
-  const tax = calcTax(subtotal, taxEnabled, taxRate);
+  const taxConfig = getResolvedTaxConfig(tenantSettings, countryCode || tenantSettings.country);
+  const tax = roundToTwo(calculateTaxAmount(subtotal, taxConfig));
   const normalizedDeliveryFee = roundToTwo(deliveryFee);
   const total = roundToTwo(subtotal + tax + normalizedDeliveryFee);
 

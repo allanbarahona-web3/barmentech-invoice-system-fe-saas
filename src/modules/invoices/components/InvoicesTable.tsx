@@ -32,6 +32,7 @@ import { tenantSettingsService } from "@/services/tenantSettingsService";
 import { usePayments } from "@/modules/payments/payments.hooks";
 import { getInvoicePaymentInfo, getPaymentStatusLabel, getPaymentStatusVariant } from "@/modules/payments/payments.utils";
 import { ReminderButton } from "@/modules/reminders/components";
+import { getDocumentTypeLabel, getStatusDefinition, getStatusLabel } from "@/lib/countryRegistry";
 
 function getLastEvent(invoice: Invoice): InvoiceEvent | undefined {
   if (!invoice.events || invoice.events.length === 0) return undefined;
@@ -239,7 +240,7 @@ export function InvoicesTable() {
               <TableRow key={invoice.id}>
                 <TableCell>
                   <Badge variant={invoice.type === "invoice" ? "default" : "secondary"}>
-                    {invoice.type === "invoice" ? "Factura" : "Cotización"}
+                    {getDocumentTypeLabel(invoice.type, country, t().invoices as Record<string, unknown>)}
                   </Badge>
                 </TableCell>
                 <TableCell className="font-medium font-mono">
@@ -272,30 +273,23 @@ export function InvoicesTable() {
                   {invoice.currency} {invoice.total.toFixed(2)}
                 </TableCell>
                 <TableCell>
+                  {(() => {
+                    const statusDefinition = getStatusDefinition(invoice.status, country);
+                    const statusLabel = getStatusLabel(
+                      invoice.status,
+                      country,
+                      t().invoices as Record<string, unknown>
+                    );
+
+                    return (
                   <Badge 
-                    variant={
-                      invoice.status === "issued" ? "default" : 
-                      invoice.status === "sent" ? "default" :
-                      invoice.status === "paid" ? "default" :
-                      "secondary"
-                    }
-                    className={
-                      invoice.status === "issued" ? "bg-green-600 hover:bg-green-700" : 
-                      invoice.status === "sent" ? "bg-blue-600 hover:bg-blue-700" : 
-                      invoice.status === "paid" ? "bg-emerald-600 hover:bg-emerald-700" :
-                      ""
-                    }
+                    variant={statusDefinition?.badgeVariant || "secondary"}
+                    className={statusDefinition?.badgeClassName || ""}
                   >
-                    {invoice.status === "issued"
-                      ? t().invoices.statusIssued
-                      : invoice.status === "sent"
-                      ? "Enviada"
-                      : invoice.status === "paid"
-                      ? "Pagada"
-                      : invoice.status === "archived"
-                      ? "Archivada"
-                      : t().invoices.statusDraft}
+                    {statusLabel}
                   </Badge>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>
                   {invoice.type === "invoice" && paymentInfo ? (

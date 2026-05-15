@@ -3,9 +3,9 @@
 // Note: TypeScript control type errors are false positives due to Zod .default() behavior.
 // The form works correctly at runtime. See: https://github.com/react-hook-form/resolvers/issues/270
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { InvoiceInput, invoiceInputSchema } from "@/modules/invoices/invoice.schema";
 import { useCreateInvoice } from "@/modules/invoices/invoice.hooks";
-import { calcLineTotal } from "@/modules/invoices/invoice.calc";
 import { calculateNextGenerationDate } from "@/modules/invoices/invoice.recurring";
 import { useCustomers } from "@/modules/customers/customer.hooks";
 import { Customer } from "@/modules/customers/customer.schema";
@@ -64,6 +63,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CURRENCIES } from "@/constants/currencies";
 import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { getDocumentTypes, getDocumentTypeLabel } from "@/lib/countryRegistry";
+import { calculateTaxAmount, getPrimaryTax, getResolvedTaxConfig } from "@/lib/taxConfig";
 import Link from "next/link";
 
 export default function NewInvoicePage() {
@@ -71,7 +72,6 @@ export default function NewInvoicePage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [showTrialExpired, setShowTrialExpired] = useState(false);
-  const [showRecurringUpgrade, setShowRecurringUpgrade] = useState(false);
   const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
   const [openProductDialog, setOpenProductDialog] = useState(false);
@@ -92,7 +92,7 @@ export default function NewInvoicePage() {
   const previousProductsLength = useRef<number>(0);
   const justClosedCustomerDialog = useRef(false);
   
-  const { data: customers, isLoading: loadingCustomers } = useCustomers();
+  const { data: customers } = useCustomers();
   const { data: products, isLoading: loadingProducts } = useProducts();
   const { data: settings } = useTenantSettingsQuery();
   const { data: companyProfile } = useCompanyProfile();
@@ -171,11 +171,14 @@ export default function NewInvoicePage() {
     name: "items",
   });
 
-  const watchItems = form.watch("items");
-  const watchType = form.watch("type");
-  const watchPaymentTerms = form.watch("paymentTerms");
-  const watchCurrency = form.watch("currency");
-  const watchDeliveryFee = form.watch("deliveryFee");
+  const watchItems = useWatch({ control: form.control, name: "items" }) ?? [];
+  const watchType = useWatch({ control: form.control, name: "type" });
+  const watchPaymentTerms = useWatch({ control: form.control, name: "paymentTerms" });
+  const watchCurrency = useWatch({ control: form.control, name: "currency" });
+  const watchDeliveryFee = useWatch({ control: form.control, name: "deliveryFee" });
+  const documentTypes = useMemo(() => getDocumentTypes(settings?.country), [settings?.country]);
+  const taxConfig = useMemo(() => getResolvedTaxConfig(settings ?? undefined, settings?.country), [settings]);
+  const primaryTax = useMemo(() => getPrimaryTax(taxConfig), [taxConfig]);
   
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -190,9 +193,7 @@ export default function NewInvoicePage() {
     return sum + lineDiscount;
   }, 0);
 
-  const taxAmount = settings?.taxEnabled
-    ? (subtotal * ((settings.taxRate ?? 0) / 100))
-    : 0;
+  const taxAmount = calculateTaxAmount(subtotal, taxConfig);
 
   const deliveryFee = Number.isFinite(watchDeliveryFee) ? watchDeliveryFee : 0;
   const total = subtotal + taxAmount + deliveryFee;
@@ -222,7 +223,7 @@ export default function NewInvoicePage() {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(amount);
-    } catch (error) {
+    } catch {
       return `${currency} ${amount.toFixed(2)}`;
     }
   };
@@ -425,8 +426,11 @@ export default function NewInvoicePage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="invoice">{t().invoices.documentTypeInvoice}</SelectItem>
-                          <SelectItem value="quote">{t().invoices.documentTypeQuote}</SelectItem>
+                          {documentTypes.map((documentType) => (
+                            <SelectItem key={documentType.id} value={documentType.id}>
+                              {getDocumentTypeLabel(documentType.id, settings?.country, t().invoices as Record<string, unknown>)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -469,7 +473,7 @@ export default function NewInvoicePage() {
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start">
+                            <PopoverContent className="w-100 p-0" align="start">
                               <div className="flex items-center border-b px-3 py-2">
                                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                 <Input
@@ -489,7 +493,7 @@ export default function NewInvoicePage() {
                                   </Button>
                                 )}
                               </div>
-                              <div className="max-h-[300px] overflow-y-auto">
+                              <div className="max-h-75 overflow-y-auto">
                                 <div className="p-1">
                                   <Button
                                     variant="ghost"
@@ -689,7 +693,7 @@ export default function NewInvoicePage() {
                         {/* Frequency */}
                         <div className="space-y-2">
                           <Label>Frecuencia</Label>
-                          <Select value={recurringFrequency} onValueChange={(value: any) => setRecurringFrequency(value)}>
+                          <Select value={recurringFrequency} onValueChange={(value) => setRecurringFrequency(value as typeof recurringFrequency)}>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecciona frecuencia" />
                             </SelectTrigger>
@@ -830,7 +834,7 @@ export default function NewInvoicePage() {
                     <Label htmlFor="scheduledMessage">Mensaje personalizado (opcional)</Label>
                     <textarea 
                       id="scheduledMessage"
-                      className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background"
+                      className="w-full min-h-20 px-3 py-2 text-sm border rounded-md bg-background"
                       value={scheduledMessage}
                       onChange={(e) => setScheduledMessage(e.target.value)}
                       placeholder="Mensaje adicional que se incluirá en el email..."
@@ -902,7 +906,7 @@ export default function NewInvoicePage() {
                         <TableCell>
                           <div className="flex gap-2">
                             {!loadingProducts && products && products.length > 0 && (
-                              <div className="w-[200px]">
+                              <div className="w-50">
                                 <Popover 
                                   open={openProductPopoverIndex === index} 
                                   onOpenChange={(open) => setOpenProductPopoverIndex(open ? index : null)}
@@ -920,7 +924,7 @@ export default function NewInvoicePage() {
                                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[350px] p-0" align="start">
+                                  <PopoverContent className="w-87.5 p-0" align="start">
                                     <div className="flex items-center border-b px-3 py-2">
                                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                       <Input
@@ -941,7 +945,7 @@ export default function NewInvoicePage() {
                                         </Button>
                                       )}
                                     </div>
-                                    <div className="max-h-[300px] overflow-y-auto">
+                                    <div className="max-h-75 overflow-y-auto">
                                       <div className="p-1">
                                         <Button
                                           type="button"
@@ -1111,10 +1115,10 @@ export default function NewInvoicePage() {
                   <span className="font-medium text-red-600">-{formatMoney(totalDiscount)}</span>
                 </div>
               )}
-              {settings?.taxEnabled && (
+              {primaryTax?.enabled && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {settings.taxName} ({settings.taxRate}%)
+                    {primaryTax.label} ({primaryTax.rate}%)
                   </span>
                   <span className="font-medium">{formatMoney(taxAmount)}</span>
                 </div>

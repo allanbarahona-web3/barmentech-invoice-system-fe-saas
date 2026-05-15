@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CURRENCIES } from "@/constants/currencies";
 import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { getDocumentTypes, getDocumentTypeLabel } from "@/lib/countryRegistry";
+import { calculateTaxAmount, getPrimaryTax, getResolvedTaxConfig } from "@/lib/taxConfig";
 import Link from "next/link";
 
 export default function EditInvoicePage() {
@@ -74,24 +76,33 @@ export default function EditInvoicePage() {
   const [openCustomerPopover, setOpenCustomerPopover] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [openProductPopoverIndex, setOpenProductPopoverIndex] = useState<number | null>(null);
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [recurringFrequency, setRecurringFrequency] = useState<"weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual">("monthly");
-  const [recurringStartDate, setRecurringStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [recurringEndDate, setRecurringEndDate] = useState<string>("");
-  const [scheduledSendEnabled, setScheduledSendEnabled] = useState(false);
-  const [scheduledDateTime, setScheduledDateTime] = useState("");
-  const [scheduledEmail, setScheduledEmail] = useState("");
-  const [scheduledMessage, setScheduledMessage] = useState("");
+  const [recurringEnabledOverride, setRecurringEnabled] = useState<boolean | undefined>(undefined);
+  const [recurringFrequencyOverride, setRecurringFrequency] = useState<"weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual" | undefined>(undefined);
+  const [recurringStartDateOverride, setRecurringStartDate] = useState<string | undefined>(undefined);
+  const [recurringEndDateOverride, setRecurringEndDate] = useState<string | undefined>(undefined);
+  const [scheduledSendEnabledOverride, setScheduledSendEnabled] = useState<boolean | undefined>(undefined);
+  const [scheduledDateTimeOverride, setScheduledDateTime] = useState<string | undefined>(undefined);
+  const [scheduledEmailOverride, setScheduledEmail] = useState<string | undefined>(undefined);
+  const [scheduledMessageOverride, setScheduledMessage] = useState<string | undefined>(undefined);
   const previousCustomersLength = useRef<number>(0);
   const previousProductsLength = useRef<number>(0);
   const justClosedCustomerDialog = useRef(false);
   
   const { data: invoice, isLoading: loadingInvoice } = useInvoice(invoiceId);
-  const { data: customers, isLoading: loadingCustomers } = useCustomers();
+  const { data: customers } = useCustomers();
   const { data: products, isLoading: loadingProducts } = useProducts();
   const { data: settings } = useTenantSettingsQuery();
   const { data: companyProfile } = useCompanyProfile();
   const updateMutation = useUpdateInvoice();
+
+  const recurringEnabled = recurringEnabledOverride ?? invoice?.recurringConfig?.enabled ?? false;
+  const recurringFrequency = recurringFrequencyOverride ?? invoice?.recurringConfig?.frequency ?? "monthly";
+  const recurringStartDate = recurringStartDateOverride ?? invoice?.recurringConfig?.startDate ?? new Date().toISOString().split("T")[0];
+  const recurringEndDate = recurringEndDateOverride ?? invoice?.recurringConfig?.endDate ?? "";
+  const scheduledSendEnabled = scheduledSendEnabledOverride ?? invoice?.scheduledSend?.enabled ?? false;
+  const scheduledDateTime = scheduledDateTimeOverride ?? invoice?.scheduledSend?.scheduledFor ?? "";
+  const scheduledEmail = scheduledEmailOverride ?? invoice?.scheduledSend?.toEmail ?? "";
+  const scheduledMessage = scheduledMessageOverride ?? invoice?.scheduledSend?.message ?? "";
 
   const enableMultiCurrency = companyProfile?.legal?.enableMultiCurrency || false;
   const defaultCurrency = companyProfile?.legal?.currency || settings?.currency || "USD";
@@ -132,22 +143,6 @@ export default function EditInvoicePage() {
         deliveryFee: invoice.deliveryFee ?? 0,
         status: invoice.status,
       });
-      
-      // Load recurring config if available
-      if (invoice.recurringConfig) {
-        setRecurringEnabled(invoice.recurringConfig.enabled);
-        setRecurringFrequency(invoice.recurringConfig.frequency);
-        setRecurringStartDate(invoice.recurringConfig.startDate);
-        setRecurringEndDate(invoice.recurringConfig.endDate || "");
-      }
-
-      // Load scheduled send config if available
-      if (invoice.scheduledSend) {
-        setScheduledSendEnabled(invoice.scheduledSend.enabled);
-        setScheduledDateTime(invoice.scheduledSend.scheduledFor);
-        setScheduledEmail(invoice.scheduledSend.toEmail);
-        setScheduledMessage(invoice.scheduledSend.message || "");
-      }
     }
   }, [invoice, form]);
 
@@ -184,9 +179,12 @@ export default function EditInvoicePage() {
     name: "items",
   });
 
-  const watchItems = form.watch("items");
-  const watchPaymentTerms = form.watch("paymentTerms");
-  const watchDeliveryFee = form.watch("deliveryFee");
+  const watchItems = useWatch({ control: form.control, name: "items" }) ?? [];
+  const watchPaymentTerms = useWatch({ control: form.control, name: "paymentTerms" });
+  const watchDeliveryFee = useWatch({ control: form.control, name: "deliveryFee" });
+  const documentTypes = useMemo(() => getDocumentTypes(settings?.country), [settings?.country]);
+  const taxConfig = useMemo(() => getResolvedTaxConfig(settings ?? undefined, settings?.country), [settings]);
+  const primaryTax = useMemo(() => getPrimaryTax(taxConfig), [taxConfig]);
 
   // Calculate totals
   const subtotal = watchItems.reduce((sum, item) => {
@@ -201,9 +199,7 @@ export default function EditInvoicePage() {
     return sum + lineDiscount;
   }, 0);
 
-  const taxAmount = settings?.taxEnabled
-    ? (subtotal * ((settings.taxRate ?? 0) / 100))
-    : 0;
+  const taxAmount = calculateTaxAmount(subtotal, taxConfig);
 
   const deliveryFee = Number.isFinite(watchDeliveryFee) ? watchDeliveryFee : 0;
   const total = subtotal + taxAmount + deliveryFee;
@@ -304,7 +300,7 @@ export default function EditInvoicePage() {
 
   if (loadingInvoice) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
@@ -312,7 +308,7 @@ export default function EditInvoicePage() {
 
   if (!invoice) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-100 space-y-4">
         <p className="text-muted-foreground">Factura no encontrada</p>
         <Link href="/system/invoices">
           <Button>Volver a facturas</Button>
@@ -351,8 +347,11 @@ export default function EditInvoicePage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="invoice">Factura</SelectItem>
-                          <SelectItem value="quote">Cotización</SelectItem>
+                          {documentTypes.map((documentType) => (
+                            <SelectItem key={documentType.id} value={documentType.id}>
+                              {getDocumentTypeLabel(documentType.id, settings?.country, t().invoices as Record<string, unknown>)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -395,7 +394,7 @@ export default function EditInvoicePage() {
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start">
+                            <PopoverContent className="w-100 p-0" align="start">
                               <div className="flex items-center border-b px-3 py-2">
                                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                 <Input
@@ -415,7 +414,7 @@ export default function EditInvoicePage() {
                                   </Button>
                                 )}
                               </div>
-                              <div className="max-h-[300px] overflow-y-auto">
+                              <div className="max-h-75 overflow-y-auto">
                                 <div className="p-1">
                                   <Button
                                     variant="ghost"
@@ -616,7 +615,7 @@ export default function EditInvoicePage() {
                     {/* Frequency */}
                     <div className="space-y-2">
                       <Label>Frecuencia</Label>
-                      <Select value={recurringFrequency} onValueChange={(value: any) => setRecurringFrequency(value)}>
+                      <Select value={recurringFrequency} onValueChange={(value) => setRecurringFrequency(value as typeof recurringFrequency)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona frecuencia" />
                         </SelectTrigger>
@@ -755,7 +754,7 @@ export default function EditInvoicePage() {
                     <Label htmlFor="scheduledMessage">Mensaje personalizado (opcional)</Label>
                     <textarea 
                       id="scheduledMessage"
-                      className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background"
+                      className="w-full min-h-20 px-3 py-2 text-sm border rounded-md bg-background"
                       value={scheduledMessage}
                       onChange={(e) => setScheduledMessage(e.target.value)}
                       placeholder="Mensaje adicional que se incluirá en el email..."
@@ -827,7 +826,7 @@ export default function EditInvoicePage() {
                         <TableCell>
                           <div className="flex gap-2">
                             {!loadingProducts && products && products.length > 0 && (
-                              <div className="w-[200px]">
+                              <div className="w-50">
                                 <Popover 
                                   open={openProductPopoverIndex === index} 
                                   onOpenChange={(open) => setOpenProductPopoverIndex(open ? index : null)}
@@ -845,7 +844,7 @@ export default function EditInvoicePage() {
                                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[350px] p-0" align="start">
+                                  <PopoverContent className="w-87.5 p-0" align="start">
                                     <div className="flex items-center border-b px-3 py-2">
                                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                       <Input
@@ -866,7 +865,7 @@ export default function EditInvoicePage() {
                                         </Button>
                                       )}
                                     </div>
-                                    <div className="max-h-[300px] overflow-y-auto">
+                                    <div className="max-h-75 overflow-y-auto">
                                       <div className="p-1">
                                         <Button
                                           type="button"
@@ -1032,12 +1031,12 @@ export default function EditInvoicePage() {
                   <span className="font-medium text-red-600">-{settings?.currency} {totalDiscount.toFixed(2)}</span>
                 </div>
               )}
-              {settings?.taxEnabled && (
+              {primaryTax?.enabled && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {settings.taxName} ({settings.taxRate}%)
+                    {primaryTax.label} ({primaryTax.rate}%)
                   </span>
-                  <span className="font-medium">{settings.currency} {taxAmount.toFixed(2)}</span>
+                  <span className="font-medium">{settings?.currency || defaultCurrency} {taxAmount.toFixed(2)}</span>
                 </div>
               )}
               <FormField

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  getDefaultInvoiceDocumentType,
+  getDefaultInvoiceStatus,
+  isValidInvoiceDocumentType,
+  isValidInvoiceStatus,
+} from "./invoice.runtime";
 
 export const paymentTermsSchema = z.enum([
   "due_on_receipt",
@@ -76,7 +82,10 @@ export const invoiceEventSchema = z.object({
 
 export const invoiceSchema = z.object({
   id: z.string(),
-  type: z.enum(["invoice", "quote"]).default("invoice"),
+  type: z
+    .string()
+    .refine((value) => isValidInvoiceDocumentType(value), "Tipo de documento inválido")
+    .default(getDefaultInvoiceDocumentType()),
   invoiceNumber: z.string(),
   customerId: z.string(),
   currency: z.string(),
@@ -85,7 +94,7 @@ export const invoiceSchema = z.object({
   tax: z.number(),
   deliveryFee: z.number().default(0),
   total: z.number(),
-  status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
+  status: z.string().refine((value) => isValidInvoiceStatus(value), "Estado de documento inválido"),
   createdAt: z.string(),
   updatedAt: z.string(),
   paymentTerms: paymentTermsSchema.default("due_on_receipt"),
@@ -107,7 +116,10 @@ export const invoiceSchema = z.object({
 
 export const invoiceInputSchema = z
   .object({
-    type: z.enum(["invoice", "quote"]).default("invoice"),
+    type: z
+      .string()
+      .refine((value) => isValidInvoiceDocumentType(value), "Tipo de documento inválido")
+      .default(getDefaultInvoiceDocumentType()),
     customerId: z.string().min(1),
     currency: z.string().min(3).max(3).optional(), // Optional: uses company default if not provided
     paymentTerms: paymentTermsSchema.default("due_on_receipt"),
@@ -124,7 +136,10 @@ export const invoiceInputSchema = z
       )
       .min(1),
     deliveryFee: z.number().min(0).default(0),
-    status: z.enum(["draft", "issued", "sent", "paid", "archived"]),
+    status: z
+      .string()
+      .refine((value) => isValidInvoiceStatus(value), "Estado de documento inválido")
+      .default(getDefaultInvoiceStatus()),
     recurringConfig: recurringConfigSchema.optional(),
     scheduledSend: scheduledSendSchema.optional(),
   })

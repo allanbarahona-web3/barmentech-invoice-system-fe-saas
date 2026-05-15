@@ -3,6 +3,41 @@ import { getTenantSlug } from "@/lib/tenantContext";
 
 const STORAGE_KEY = "tenantSettings";
 
+function resolveCountryPack(
+  country: string,
+  storedCountryPack?: { code?: string; enabled?: boolean; source?: string }
+) {
+  if (storedCountryPack?.code) {
+    return {
+      code: storedCountryPack.code.toUpperCase(),
+      enabled: storedCountryPack.enabled ?? true,
+      source:
+        storedCountryPack.source === "backend" ||
+        storedCountryPack.source === "legacy-local" ||
+        storedCountryPack.source === "derived"
+          ? storedCountryPack.source
+          : "backend",
+    } as const;
+  }
+
+  const legacyCountryCode = country.toLowerCase();
+  const legacyPack = localStorage.getItem(`countryPack:${legacyCountryCode}`);
+
+  if (legacyPack !== null) {
+    return {
+      code: country.toUpperCase(),
+      enabled: JSON.parse(legacyPack),
+      source: "legacy-local",
+    } as const;
+  }
+
+  return {
+    code: country.toUpperCase(),
+    enabled: true,
+    source: "derived",
+  } as const;
+}
+
 // Mock API functions - estructura lista para reemplazar con API real
 export const tenantSettingsService = {
   async getTenantSettings(): Promise<TenantSettings | null> {
@@ -24,9 +59,11 @@ export const tenantSettingsService = {
     
     if (stored) {
       const settings = JSON.parse(stored);
+      const country = settings.country || "CR";
       // Merge con defaults de features para asegurar que nuevas features estén disponibles
       return {
         ...settings,
+        countryPack: resolveCountryPack(country, settings.countryPack),
         features: {
           ...defaultFeatures,
           ...settings.features,
@@ -38,6 +75,11 @@ export const tenantSettingsService = {
     return {
       companyName: "",
       country: "CR",
+      countryPack: {
+        code: "CR",
+        enabled: true,
+        source: "derived",
+      },
       currency: "CRC",
       taxEnabled: true,
       taxName: "IVA",
@@ -71,16 +113,22 @@ export const tenantSettingsService = {
 
   async completeTenantOnboarding(settings: Partial<TenantSettings>): Promise<TenantSettings> {
     const current = await this.getTenantSettings();
+    const countryCode = (settings.country || current?.country || "CR").toUpperCase();
     
     const updated: TenantSettings = {
       ...current!,
       ...settings,
+      countryPack: {
+        code: countryCode,
+        enabled: true,
+        source: "derived",
+      },
       onboardingCompleted: true,
     };
 
     const result = await this.saveTenantSettings(updated);
 
-    // Auto-activate country pack based on selected country
+    // Legacy compatibility while UI migrates away from localStorage-only assumptions
     if (settings.country) {
       const countryCode = settings.country.toLowerCase();
       const countryPackKey = `countryPack:${countryCode}`;

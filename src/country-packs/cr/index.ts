@@ -43,3 +43,15 @@ export {
   applyCRFiscalSanitization,
   validateCRFiscal,
 } from "./cr.apply";
+
+// ===== MANIFEST =====
+export {
+  CR_MANIFEST,
+  CR_DOCUMENT_TYPES,
+  CR_STATUS_IDS,
+} from "./manifest";
+
+export type {
+  CRDocumentType,
+  CRDocumentStatus,
+} from "./manifest";

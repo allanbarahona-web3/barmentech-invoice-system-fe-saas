@@ -42,6 +42,11 @@ export const step3Schema = z.object({
 export const tenantSettingsSchema = z.object({
   companyName: z.string().min(2),
   country: z.string().min(1),
+  countryPack: z.object({
+    code: z.string().min(2),
+    enabled: z.boolean().default(true),
+    source: z.enum(["backend", "derived", "legacy-local"]).default("derived"),
+  }).optional(),
   currency: z.string().min(1),
   taxEnabled: z.boolean(),
   taxName: z.string().optional(),

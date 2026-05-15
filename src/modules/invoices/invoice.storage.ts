@@ -10,6 +10,18 @@ import {
   incrementQuoteNumber,
   incrementInvoiceNumber 
 } from "./invoice.numbering";
+import {
+  ARCHIVED_STATUS,
+  DRAFT_STATUS,
+  INVOICE_TYPE,
+  ISSUED_STATUS,
+  PAID_STATUS,
+  QUOTE_TYPE,
+  SENT_STATUS,
+  getDefaultInvoiceStatus,
+  isValidInvoiceDocumentType,
+  isValidInvoiceStatus,
+} from "./invoice.runtime";
 import { tenantSettingsService } from "@/services/tenantSettingsService";
 import { getExchangeRate, getCountryBaseCurrency } from "@/lib/exchangeRates";
 import { getCompanyProfile } from "@/modules/company/company.storage";
@@ -90,27 +102,34 @@ function appendInvoiceEvent(
 /**
  * Migrate old invoices to new schema with type field
  */
-function migrateInvoices(invoices: any[]): Invoice[] {
-  return invoices.map((invoice): Invoice => {
+function migrateInvoices(invoices: unknown[]): Invoice[] {
+  return invoices.map((raw): Invoice => {
+    const invoice = (raw && typeof raw === "object" ? raw : {}) as Partial<Invoice> & Record<string, unknown>;
     // Add type field if missing (default to "invoice")
-    if (!invoice.type) {
-      invoice.type = "invoice";
+    if (!invoice.type || !isValidInvoiceDocumentType(invoice.type)) {
+      invoice.type = INVOICE_TYPE;
     }
     
     // Ensure status includes new values
-    if (!["draft", "issued", "sent", "paid", "archived"].includes(invoice.status)) {
-      invoice.status = "draft";
+    if (!isValidInvoiceStatus(invoice.status ? String(invoice.status) : "")) {
+      invoice.status = getDefaultInvoiceStatus();
     }
 
     // Ensure items array exists and each item has an ID
     if (!invoice.items) {
       invoice.items = [];
     } else {
-      invoice.items = invoice.items.map((item: any) => {
-        if (!item.id) {
-          item.id = generateItemId();
+      invoice.items = invoice.items.map((item) => {
+        const normalizedItem =
+          item && typeof item === "object"
+            ? (item as Partial<InvoiceItem> & Record<string, unknown>)
+            : ({} as Partial<InvoiceItem> & Record<string, unknown>);
+
+        if (!normalizedItem.id) {
+          normalizedItem.id = generateItemId();
         }
-        return item;
+
+        return normalizedItem as InvoiceItem;
       });
     }
 
@@ -126,23 +145,31 @@ function migrateInvoices(invoices: any[]): Invoice[] {
       
       // Ensure each event has required fields
       invoice.events = invoice.events
-        .filter((event: any) => event && typeof event === 'object')
-        .map((event: any) => {
-          if (!event.id) {
-            event.id = generateEventId();
+        .filter((event) => Boolean(event && typeof event === "object"))
+        .map((event) => {
+          const normalizedEvent = event as Partial<InvoiceEvent> & Record<string, unknown>;
+
+          if (!normalizedEvent.id) {
+            normalizedEvent.id = generateEventId();
           }
-          if (!event.at) {
-            event.at = new Date().toISOString();
+          if (!normalizedEvent.at) {
+            normalizedEvent.at = new Date().toISOString();
           }
           // Ensure type is valid
-          if (!event.type || !validEventTypes.includes(event.type)) {
-            event.type = "UPDATED";
+          if (
+            typeof normalizedEvent.type !== "string" ||
+            !validEventTypes.includes(normalizedEvent.type)
+          ) {
+            normalizedEvent.type = "UPDATED";
           }
           // Ensure meta is either undefined or an object
-          if (event.meta !== undefined && (typeof event.meta !== 'object' || Array.isArray(event.meta))) {
-            delete event.meta;
+          if (
+            normalizedEvent.meta !== undefined &&
+            (typeof normalizedEvent.meta !== "object" || Array.isArray(normalizedEvent.meta))
+          ) {
+            delete normalizedEvent.meta;
           }
-          return event;
+          return normalizedEvent as InvoiceEvent;
         });
     }
 
@@ -272,7 +299,7 @@ export async function updateInvoicePaymentStatus(
   const invoice = invoices[invoiceIndex];
   
   // Only update payment status for invoices (not quotes)
-  if (invoice.type !== 'invoice') {
+  if (invoice.type !== INVOICE_TYPE) {
     return;
   }
 
@@ -287,19 +314,19 @@ export async function updateInvoicePaymentStatus(
   // Determine new status based on payment
   if (balance <= 0 && totalPaid > 0) {
     // Fully paid - change to paid regardless of previous status (except archived)
-    if (previousStatus !== 'archived') {
-      newStatus = 'paid';
+    if (previousStatus !== ARCHIVED_STATUS) {
+      newStatus = PAID_STATUS;
     }
   } else if (balance > 0 && totalPaid > 0) {
     // Partially paid - keep as issued/sent
-    if (previousStatus === 'paid') {
+    if (previousStatus === PAID_STATUS) {
       // Was paid but payment was removed, revert to sent
-      newStatus = 'sent';
+      newStatus = SENT_STATUS;
     }
   } else if (totalPaid === 0) {
     // No payments - if was paid, revert to sent
-    if (previousStatus === 'paid') {
-      newStatus = 'sent';
+    if (previousStatus === PAID_STATUS) {
+      newStatus = SENT_STATUS;
     }
   }
 
@@ -312,7 +339,7 @@ export async function updateInvoicePaymentStatus(
     };
 
     // Add appropriate event
-    if (newStatus === 'paid') {
+    if (newStatus === PAID_STATUS) {
       updatedInvoice = appendInvoiceEvent(updatedInvoice, 'MARKED_PAID', {
         totalPaid: totalPaid.toString(),
         paymentsCount: invoicePayments.length.toString(),
@@ -399,11 +426,11 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   let invoiceNumber: string;
   let incrementFunction: () => Promise<void>;
   
-  if (input.type === "quote") {
+  if (input.type === QUOTE_TYPE) {
     // Quotes always use COT- numbering
     invoiceNumber = await generateQuoteNumber();
     incrementFunction = incrementQuoteNumber;
-  } else if (input.status === "draft") {
+  } else if (input.status === DRAFT_STATUS) {
     // Draft invoices use DRF- numbering
     invoiceNumber = await generateDraftNumber();
     incrementFunction = incrementDraftNumber;
@@ -428,8 +455,8 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   // Calculate totals
   const { subtotal, tax, deliveryFee, total } = calcInvoiceTotals(
     items,
-    settings.taxEnabled,
-    settings.taxRate ?? 0,
+    settings,
+    settings.country,
     input.deliveryFee ?? 0
   );
 
@@ -440,7 +467,7 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
 
   let newInvoice: Invoice = {
     id: generateId(),
-    type: input.type || "invoice",
+    type: input.type || INVOICE_TYPE,
     invoiceNumber,
     customerId: input.customerId,
     currency: input.currency || settings.currency,
@@ -474,14 +501,14 @@ export async function createInvoice(input: InvoiceInput): Promise<Invoice> {
   });
 
   // Register appropriate creation event based on status
-  if (input.status === "draft") {
+  if (input.status === DRAFT_STATUS) {
     newInvoice = appendInvoiceEvent(newInvoice, "CREATED_DRAFT");
   } else {
     newInvoice = appendInvoiceEvent(newInvoice, "CREATED");
   }
 
   // If status is issued, register MARKED_ISSUED event
-  if (input.status === "issued") {
+  if (input.status === ISSUED_STATUS) {
     newInvoice = appendInvoiceEvent(newInvoice, "MARKED_ISSUED");
   }
 
@@ -535,8 +562,8 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
   // Recalculate totals
   const { subtotal, tax, deliveryFee, total } = calcInvoiceTotals(
     items,
-    settings.taxEnabled,
-    settings.taxRate ?? 0,
+    settings,
+    settings.country,
     typeof input.deliveryFee === "number" ? input.deliveryFee : invoices[index].deliveryFee ?? 0
   );
 
@@ -594,7 +621,7 @@ export async function deleteInvoice(id: string): Promise<void> {
 
 export async function updateInvoiceStatus(
   id: string,
-  status: "draft" | "issued"
+  status: Invoice["status"]
 ): Promise<Invoice> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -616,7 +643,7 @@ export async function updateInvoiceStatus(
   };
 
   // If converting draft to issued, generate official invoice number
-  if (previousStatus === "draft" && status === "issued") {
+  if (previousStatus === DRAFT_STATUS && status === ISSUED_STATUS) {
     const officialNumber = await generateInvoiceNumber();
     updatedInvoice.invoiceNumber = officialNumber;
     
@@ -630,7 +657,7 @@ export async function updateInvoiceStatus(
   }
 
   // Register MARKED_ISSUED event if changing to issued
-  if (status === "issued") {
+  if (status === ISSUED_STATUS) {
     updatedInvoice = appendInvoiceEvent(updatedInvoice, "MARKED_ISSUED");
   }
 
@@ -651,7 +678,7 @@ export async function recordInvoiceExportPdf(id: string): Promise<Invoice> {
     throw new Error("Invoice not found");
   }
 
-  let updatedInvoice = appendInvoiceEvent(
+  const updatedInvoice = appendInvoiceEvent(
     invoices[index],
     "EXPORTED_PDF"
   );
@@ -691,7 +718,7 @@ export async function recordInvoiceSent(
 
   let updatedInvoice: Invoice = {
     ...invoices[index],
-    status: "sent",
+    status: SENT_STATUS,
     sent: {
       toEmail,
       message,
@@ -701,7 +728,7 @@ export async function recordInvoiceSent(
   };
 
   // Use different event type based on document type
-  const eventType = updatedInvoice.type === "quote" ? "QUOTE_SENT" : "SENT";
+  const eventType = updatedInvoice.type === QUOTE_TYPE ? "QUOTE_SENT" : "SENT";
   updatedInvoice = appendInvoiceEvent(updatedInvoice, eventType, meta);
 
   invoices[index] = updatedInvoice;
@@ -723,7 +750,7 @@ export async function archiveInvoice(id: string): Promise<Invoice> {
 
   let updatedInvoice: Invoice = {
     ...invoices[index],
-    status: "archived",
+    status: ARCHIVED_STATUS,
     archivedAt: new Date().toISOString(),
   };
 
@@ -750,7 +777,7 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
     throw new Error("Quote not found");
   }
 
-  if (quote.type !== "quote") {
+  if (quote.type !== QUOTE_TYPE) {
     throw new Error("Document is not a quote");
   }
 
@@ -777,7 +804,7 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
   // Create new invoice from quote
   let newInvoice: Invoice = {
     id: generateId(),
-    type: "invoice",
+    type: INVOICE_TYPE,
     invoiceNumber,
     customerId: quote.customerId,
     currency: quote.currency,
@@ -786,7 +813,7 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
     tax: quote.tax,
     deliveryFee: quote.deliveryFee ?? 0,
     total: quote.total,
-    status: "draft",
+    status: DRAFT_STATUS,
     originQuoteId: quoteId, // Link back to original quote
     createdAt: now,
     updatedAt: now,
@@ -805,7 +832,7 @@ export async function convertQuoteToInvoice(quoteId: string): Promise<Invoice> {
   // Update the quote to record conversion
   const quoteIndex = invoices.findIndex(inv => inv.id === quoteId);
   if (quoteIndex !== -1) {
-    let updatedQuote = appendInvoiceEvent(
+    const updatedQuote = appendInvoiceEvent(
       invoices[quoteIndex],
       "CONVERTED_TO_INVOICE",
       {

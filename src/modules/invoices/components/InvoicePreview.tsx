@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Repeat, Calendar, CalendarX2, Sparkles } from "lucide-react";
+import { Repeat } from "lucide-react";
+import Image from "next/image";
 import { Invoice } from "../invoice.schema";
 import { CompanyProfile } from "@/modules/company/company.schema";
 import { Customer } from "@/modules/customers/customer.schema";
@@ -10,6 +11,8 @@ import { CustomHeaderField } from "@/modules/company/company.schema";
 import { Product } from "@/modules/products/product.schema";
 import { calcTotalDiscount } from "../invoice.calc";
 import { getCountryBaseCurrency, convertCurrency } from "@/lib/exchangeRates";
+import { getStatusDefinition, getStatusLabel } from "@/lib/countryRegistry";
+import { getPrimaryTax, getResolvedTaxConfig } from "@/lib/taxConfig";
 // import { isCREnabled } from "@/modules/company/company.country";
 // import { buildCRFiscalSummary } from "@/country-packs/cr";
 import { t } from "@/i18n";
@@ -31,7 +34,24 @@ export function InvoicePreview({
 }: InvoicePreviewProps) {
   const { branding, legal, fiscal } = companyProfile;
   // const showCRInfo = isCREnabled(legal.country);
-  const [customHeaderFields, setCustomHeaderFields] = useState<CustomHeaderField[]>([]);
+  const [customHeaderFields] = useState<CustomHeaderField[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    const stored = localStorage.getItem("customHeaderFields");
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const fields = JSON.parse(stored) as CustomHeaderField[];
+      return fields.filter((f) => f.enabled);
+    } catch (e) {
+      console.error("Failed to parse custom header fields:", e);
+      return [];
+    }
+  });
 
   // Calculate total discount
   const totalDiscount = calcTotalDiscount(invoice.items);
@@ -39,6 +59,10 @@ export function InvoicePreview({
   // Calculate currency conversion if needed
   const baseCurrency = legal.country ? getCountryBaseCurrency(legal.country) : null;
   const showConversion = baseCurrency && baseCurrency !== invoice.currency && invoice.exchangeRate;
+  const statusDefinition = getStatusDefinition(invoice.status, legal.country);
+  const statusLabel = getStatusLabel(invoice.status, legal.country, t().invoices as Record<string, unknown>);
+  const resolvedTaxConfig = getResolvedTaxConfig(tenantSettings, legal.country);
+  const primaryTax = getPrimaryTax(resolvedTaxConfig);
   const convertedSubtotal = showConversion ? convertCurrency(invoice.subtotal, invoice.currency, baseCurrency) : null;
   const convertedTax = showConversion ? convertCurrency(invoice.tax, invoice.currency, baseCurrency) : null;
   const convertedDeliveryFee = showConversion
@@ -58,20 +82,6 @@ export function InvoicePreview({
     });
   }, [invoice.recurringConfig, invoice.currency, legal.currency, invoice.id]);
 
-  // Load custom header fields from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("customHeaderFields");
-    if (stored) {
-      try {
-        const fields = JSON.parse(stored) as CustomHeaderField[];
-        // Only include enabled fields
-        setCustomHeaderFields(fields.filter(f => f.enabled));
-      } catch (e) {
-        console.error("Failed to parse custom header fields:", e);
-      }
-    }
-  }, []);
-
   const getPaymentTermsLabel = () => {
     switch (invoice.paymentTerms) {
       case "due_on_receipt":
@@ -89,18 +99,6 @@ export function InvoicePreview({
       default:
         return "Contado";
     }
-  };
-
-  const getRecurringFrequencyLabel = (frequency: string) => {
-    const labels: Record<string, string> = {
-      "weekly": "Semanal (cada 7 días)",
-      "biweekly": "Quincenal (cada 15 días)",
-      "monthly": "Mensual (cada mes)",
-      "quarterly": "Trimestral (cada 3 meses)",
-      "semiannual": "Semestral (cada 6 meses)",
-      "annual": "Anual (cada año)",
-    };
-    return labels[frequency] || frequency;
   };
 
   // Format currency - use appropriate locale based on currency
@@ -162,12 +160,15 @@ export function InvoicePreview({
             {/* Grid 1: Company Info */}
             <div className="space-y-2">
               {branding.logoUrl && (
-                <img
+                <Image
                   src={branding.logoUrl}
                   alt="Logo"
+                  width={160}
+                  height={56}
+                  unoptimized
                   className="h-14 object-contain mb-3"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
+                    (e.currentTarget as HTMLElement).style.display = "none";
                   }}
                 />
               )}
@@ -246,24 +247,16 @@ export function InvoicePreview({
                     className="inline-block px-2 py-1 text-xs font-medium rounded"
                     style={{
                       backgroundColor:
-                        invoice.status === "issued" || invoice.status === "sent" || invoice.status === "paid"
+                        statusDefinition?.emphasized
                           ? branding.secondaryColor || "#10b981"
                           : "#d1d5db",
                       color:
-                        invoice.status === "issued" || invoice.status === "sent" || invoice.status === "paid"
+                        statusDefinition?.emphasized
                           ? "#ffffff"
                           : "#000000",
                     }}
                   >
-                    {invoice.status === "issued"
-                      ? t().invoices.statusIssued
-                      : invoice.status === "sent"
-                        ? t().invoices.statusSent
-                        : invoice.status === "paid"
-                          ? "Pagada"
-                          : invoice.status === "archived"
-                            ? t().invoices.statusArchived
-                            : t().invoices.statusDraft}
+                    {statusLabel}
                   </span>
                 </div>
               </div>
@@ -396,7 +389,7 @@ export function InvoicePreview({
                 className="border-b-2"
                 style={{ borderColor: branding.primaryColor || "#000000" }}
               >
-                <th className="text-left py-3 font-semibold text-gray-700 w-[200px]">
+                <th className="text-left py-3 font-semibold text-gray-700 w-50">
                   Producto
                 </th>
                 <th className="text-left py-3 font-semibold text-gray-700">
@@ -490,10 +483,10 @@ export function InvoicePreview({
                 </div>
               )}
 
-              {tenantSettings.taxEnabled && invoice.tax > 0 && (
+              {primaryTax?.enabled && invoice.tax > 0 && (
                 <div className="flex justify-between text-gray-700">
                   <span>
-                    {tenantSettings.taxName} ({tenantSettings.taxRate}%):
+                    {primaryTax.label} ({primaryTax.rate}%):
                   </span>
                   <div className="text-right">
                     <div className="font-medium">{formatCurrency(invoice.tax)}</div>

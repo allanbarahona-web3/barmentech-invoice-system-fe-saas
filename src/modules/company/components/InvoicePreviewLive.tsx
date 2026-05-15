@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { CustomHeaderField } from "../company.schema";
+import Image from "next/image";
 
 interface InvoicePreviewLiveProps {
   logoUrl?: string;
@@ -51,7 +52,7 @@ export function InvoicePreviewLive({
         </div>
 
         {/* Invoice preview - simplified version */}
-        <div className="border rounded-lg p-6 bg-gradient-to-b from-white to-gray-50 shadow-sm scale-90 origin-top">
+        <div className="border rounded-lg p-6 bg-linear-to-b from-white to-gray-50 shadow-sm scale-90 origin-top">
           {/* Header - affected by Branding */}
           <div
             className="border-b-4 pb-4 mb-4"
@@ -61,12 +62,15 @@ export function InvoicePreviewLive({
               {/* Grid 1: Logo and company info */}
               <div className="space-y-1">
                 {logoUrl ? (
-                  <img
+                  <Image
                     src={logoUrl}
                     alt="Logo"
+                    width={96}
+                    height={40}
+                    unoptimized
                     className="h-10 object-contain mb-2"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
+                      (e.currentTarget as HTMLElement).style.display = "none";
                     }}
                   />
                 ) : (
@@ -112,6 +116,9 @@ export function InvoicePreviewLive({
                   ) : (
                     <p><span className="font-medium">Teléfono:</span> +506 1234-5678</p>
                   )}
+                    {address && (
+                      <p><span className="font-medium">Dirección:</span> {address}</p>
+                    )}
                 </div>
               </div>
 

@@ -78,7 +78,7 @@ export function useUpdateInvoiceStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: "draft" | "issued" }) =>
+    mutationFn: ({ id, status }: { id: string; status: Invoice["status"] }) =>
       updateInvoiceStatus(id, status),
     onSuccess: (updatedInvoice) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.invoices });

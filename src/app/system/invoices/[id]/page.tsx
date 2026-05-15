@@ -22,7 +22,6 @@ import { InvoiceActivity } from "@/modules/invoices/components/InvoiceActivity";
 import { SendInvoiceDialog } from "@/modules/invoices/components/SendInvoiceDialog";
 import { RegisterPaymentDialog } from "@/modules/payments/components/RegisterPaymentDialog";
 import { InvoicePaymentsHistory } from "@/modules/payments/components/InvoicePaymentsHistory";
-import { useInvoicePayments } from "@/modules/payments/payments.hooks";
 import { getInvoicePaymentInfo } from "@/modules/payments/payments.utils";
 import { usePayments } from "@/modules/payments/payments.hooks";
 import { Badge } from "@/components/ui/badge";
@@ -260,6 +259,7 @@ export default function InvoiceDetailPage() {
           discount: item.discount,
           productId: item.productId,
         })),
+        deliveryFee: invoice.deliveryFee ?? 0,
         status: invoice.status,
         recurringConfig: invoice.recurringConfig,
         scheduledSend: {
@@ -292,7 +292,7 @@ export default function InvoiceDetailPage() {
   if (isLoading) {
     console.log('[InvoiceDetailPage] Rendering loading state');
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="text-center space-y-2">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
           <p className="text-sm text-muted-foreground">{t().invoicePreview.loading}</p>
@@ -305,7 +305,7 @@ export default function InvoiceDetailPage() {
   if (!invoice || invoiceError) {
     console.log('[InvoiceDetailPage] Rendering not found state:', { hasInvoice: !!invoice, invoiceError });
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-100 space-y-4">
         <div className="text-center space-y-2">
           <h2 className="text-xl font-semibold">{t().invoicePreview.notFound}</h2>
           <p className="text-muted-foreground">{t().invoicePreview.notFoundDescription}</p>
@@ -326,7 +326,7 @@ export default function InvoiceDetailPage() {
       hasTenantSettings: !!tenantSettings,
     });
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-100 space-y-4">
         <div className="text-center space-y-2">
           <h2 className="text-xl font-semibold">{t().invoicePreview.errorLoading}</h2>
           <p className="text-muted-foreground">
